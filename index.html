@@ -3,122 +3,181 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lucha contra Don Mate v8.1 (Corregido)</title>
+  <title>Lucha contra Don Mate v10.1 - Impact Edition</title>
   <style>
+    /* --- CONFIGURACIÓN GLOBAL Y FONDO ESPACIAL --- */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
     body {
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
       margin: 0;
-      background-color: #f4f4f9;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0c0a1f; /* Azul noche profundo */
+      color: #e0e0e0;
+      font-family: 'Orbitron', 'Segoe UI', sans-serif; /* Fuente futurista */
+      overflow: hidden;
     }
-    
+    .stars-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+    .star { position: absolute; background-color: white; border-radius: 50%; animation: fall linear infinite; }
+    @keyframes fall { to { transform: translateY(100vh); } }
+
     .hidden { display: none !important; }
 
-    /* --- ESTILOS DEL MENÚ --- */
+    /* --- ESTILOS DEL MENÚ ÉPICO --- */
     #menu-container {
         display: flex; flex-direction: column; align-items: center; text-align: center;
-        background-color: white; padding: 40px; border-radius: 15px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1); max-width: 500px;
+        background: rgba(10, 10, 30, 0.75); backdrop-filter: blur(10px);
+        border: 2px solid rgba(0, 255, 255, 0.3); border-radius: 20px;
+        padding: 40px; box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), inset 0 0 15px rgba(123, 44, 191, 0.5);
+        max-width: 600px; animation: fadeIn 1s ease-out;
     }
-    #menu-container h1 { color: #5a189a; margin-top: 0; }
-    .instructions {
-        width: 90%; text-align: left; margin: 15px 0; padding: 15px;
-        border: 2px solid #e0e0e0; border-radius: 10px;
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    #menu-container h1 {
+        font-size: 3.5em; font-weight: 900; margin: 0 0 20px 0; text-transform: uppercase; color: #fff;
+        text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #7b2cbf;
+        animation: title-flicker 5s infinite alternate;
     }
-    .instructions h3 { text-align: center; margin-top: 0; color: #333; }
-    .instructions ul { padding-left: 20px; margin-bottom: 0; }
-    .instructions li { margin-bottom: 8px; }
+    @keyframes title-flicker {
+        0%, 18%, 22%, 25%, 53%, 57%, 100% { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 40px #00ffff, 0 0 60px #7b2cbf; }
+        20%, 24%, 55% { text-shadow: none; }
+    }
+    .instructions { width: 90%; margin: 15px 0; padding: 15px; border: none; background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
+    .instructions h3 { text-align: center; margin-top: 0; color: #00ffff; font-weight: 700; }
+    .instructions ul { padding-left: 20px; list-style: none; }
+    .instructions li { margin-bottom: 8px; position: relative; padding-left: 20px; }
+    .instructions li::before { content: '»'; position: absolute; left: 0; color: #00ffff; font-weight: bold; }
+    #menu-container h2 { color: #fff; text-shadow: 0 0 5px #7b2cbf; }
     .difficulty-options { display: flex; gap: 15px; margin: 20px 0; }
     .difficulty-options label {
-        padding: 10px 20px; border: 2px solid #ccc; border-radius: 8px;
-        cursor: pointer; transition: all 0.2s;
+        padding: 12px 25px; border: 2px solid rgba(0, 255, 255, 0.5); border-radius: 8px; cursor: pointer;
+        transition: all 0.3s ease; font-weight: 700; background: transparent; color: rgba(255, 255, 255, 0.8);
     }
     .difficulty-options input { display: none; }
+    .difficulty-options label:hover { background: rgba(0, 255, 255, 0.1); border-color: #00ffff; color: #fff; }
     .difficulty-options input:checked + label {
-        background-color: #5a189a; color: white; border-color: #5a189a;
+        background-color: #00ffff; color: #0c0a1f; border-color: #00ffff;
+        box-shadow: 0 0 15px #00ffff; transform: scale(1.05);
     }
     #startGameBtn {
-        padding: 15px 30px; font-size: 1.2em; font-weight: bold; color: white;
-        background-color: #28a745; border: none; border-radius: 10px;
-        cursor: pointer; transition: background-color 0.2s;
+        padding: 18px 40px; font-size: 1.5em; font-weight: 700; color: white;
+        background: linear-gradient(45deg, #7b2cbf, #5a189a); border: 2px solid #c77dff;
+        border-radius: 10px; cursor: pointer; transition: all 0.3s ease;
+        text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 20px rgba(123, 44, 191, 0.6);
+        animation: pulse 2s infinite;
     }
-    #startGameBtn:hover { background-color: #218838; }
+    #startGameBtn:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(199, 125, 255, 0.8); animation-play-state: paused; }
+    @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 20px rgba(123, 44, 191, 0.6); }
+        50% { transform: scale(1.03); box-shadow: 0 0 30px rgba(199, 125, 255, 0.9); }
+        100% { transform: scale(1); box-shadow: 0 0 20px rgba(123, 44, 191, 0.6); }
+    }
 
-    /* --- ESTILOS DEL JUEGO --- */
+    /* --- ESTILOS DEL JUEGO - ACTUALIZADOS --- */
     .game-container {
-      width: 800px; height: 550px; background-color: white; border: 2px solid #333;
-      border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      width: 850px; height: 600px;
+      border: 2px solid rgba(0, 255, 255, 0.5);
+      border-radius: 15px;
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
       position: relative; box-sizing: border-box; padding: 20px; overflow: hidden;
+      background: linear-gradient(315deg, #0d0221, #241e4e, #0d0221);
+      background-size: 400% 400%;
+      animation: animated-gradient 15s ease infinite;
     }
+    @keyframes animated-gradient {
+        0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; }
+    }
+    .attack-flash {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle at 80% 50%, rgba(255,255,255,0.8), rgba(255, 0, 0, 0.5), transparent 70%);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .attack-flash.active { animation: flash-anim 0.4s ease-out; }
+    @keyframes flash-anim { from { opacity: 1; } to { opacity: 0; } }
     .score-display {
         position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-        font-size: 1.8em; font-weight: bold; color: #5a189a;
+        font-size: 2em; font-weight: 700; color: #fff; text-shadow: 0 0 8px #00ffff;
     }
     .character-info { position: absolute; top: 60px; width: 300px; }
     .character-info.player { left: 40px; }
     .character-info.enemy { right: 40px; text-align: right; }
-    .character-info h2 { margin: 0 0 5px 0; font-size: 1.2em; }
+    .character-info h2 { margin: 0 0 10px 0; font-size: 1.5em; text-transform: uppercase; text-shadow: 0 0 5px #fff; }
     .health-bar-container {
-      width: 100%; height: 28px; border: 3px solid #333;
-      border-radius: 15px; background-color: #e0e0e0; overflow: hidden;
+      width: 100%; height: 28px; border: 2px solid rgba(0, 255, 255, 0.3);
+      border-radius: 15px; background-color: rgba(0,0,0,0.3); overflow: hidden;
     }
     .health-bar-fill { height: 100%; transition: width 0.5s ease-in-out; border-radius: 12px 0 0 12px; }
-    .health-bar-fill.player { background-color: #007bff; }
-    .health-bar-fill.enemy { background-color: #dc3545; }
-    .hp-text { font-weight: bold; margin-top: 5px; }
-    .character-container { position: absolute; top: 170px; width: 100px; height: 100px; }
-    .player-character { left: 100px; animation: movePlayer 3.5s infinite alternate ease-in-out; }
-    .enemy-character { right: 150px; animation: moveEnemy 3s infinite alternate ease-in-out; }
-    @keyframes movePlayer { from { transform: translateX(0px); } to { transform: translateX(-20px); } }
-    @keyframes moveEnemy { from { transform: translateX(0px); } to { transform: translateX(40px); } }
+    .health-bar-fill.player { background: #00ffff; box-shadow: inset 0 0 10px #00ffff, 0 0 15px #00ffff; }
+    .health-bar-fill.enemy { background: #ff005d; box-shadow: inset 0 0 10px #ff005d, 0 0 15px #ff005d; }
+    .hp-text { font-weight: bold; margin-top: 5px; color: #e0e0e0; text-shadow: 0 0 3px #000; }
+    .character-container { position: absolute; top: 180px; width: 120px; height: 120px; filter: drop-shadow(0 0 15px); }
+    .player-character {
+        left: 100px;
+        animation: movePlayer 3.5s infinite alternate ease-in-out, glow-player 2s infinite alternate;
+        color: #00ffff;
+    }
+    .enemy-character {
+        right: 150px;
+        animation: moveEnemy 1.2s infinite alternate ease-in, glow-enemy 1.8s infinite alternate;
+        color: #ff005d;
+    }
+    .enemy-character.hit-effect {
+        animation: hit-glow 0.5s, moveEnemy 1.2s infinite alternate ease-in, glow-enemy 1.8s infinite alternate;
+    }
+    @keyframes hit-glow {
+        0%, 50% { filter: brightness(3.5) drop-shadow(0 0 40px #ffffff); }
+        100% { filter: brightness(1) drop-shadow(0 0 25px #ff005d); }
+    }
+    @keyframes glow-player { from { filter: drop-shadow(0 0 10px #00ffff); } to { filter: drop-shadow(0 0 25px #00ffff); } }
+    @keyframes glow-enemy { from { filter: drop-shadow(0 0 10px #ff005d); } to { filter: drop-shadow(0 0 25px #ff005d); } }
+    @keyframes movePlayer { from { transform: translateY(0px); } to { transform: translateY(-20px); } }
+    @keyframes moveEnemy { from { transform: translateY(0px); } to { transform: translateY(30px); } }
     .shake { animation: shake 0.5s; }
     @keyframes shake {
-        0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
-        20%, 40%, 60%, 80% { transform: translateX(8px); }
+        0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+        20%, 40%, 60%, 80% { transform: translateX(10px); }
     }
     .speech-bubble {
-        position: absolute; top: 130px; right: 260px; background-color: #f1f1f1; padding: 15px;
-        border-radius: 10px; border: 2px solid #333; font-weight: bold; opacity: 0; visibility: hidden;
-        transition: opacity 0.3s ease-in-out, visibility 0.3s; transform: translateY(10px);
+        position: absolute; top: 140px; right: 280px; background-color: rgba(0,0,0,0.5); padding: 15px;
+        border-radius: 10px; border: 1px solid #ff005d; font-weight: bold; opacity: 0; visibility: hidden;
+        transition: all 0.3s ease-in-out; transform: translateY(10px); color: #ff005d;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10;
     }
     .speech-bubble.visible { opacity: 1; visibility: visible; transform: translateY(0); }
-    .speech-bubble::after {
-        content: ''; position: absolute; bottom: 50%; right: -12px; margin-top: -6px;
-        border-width: 6px; border-style: solid; border-color: transparent transparent transparent #333;
-    }
-    .game-ui {
-        position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-        text-align: center; width: 90%;
-    }
-    .question { font-size: 2.5em; font-weight: bold; color: #5a189a; margin: 0; }
-    .timer { font-size: 1.5em; color: #333; margin: 10px 0; transition: color 0.3s; }
+    .speech-bubble::after { content: ''; position: absolute; bottom: 50%; right: -12px; margin-top: -6px; border-width: 6px; border-style: solid; border-color: transparent transparent transparent #ff005d; }
+    .game-ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; width: 90%; }
+    .question { font-size: 3.5em; font-weight: 900; color: #fff; margin: 0; text-shadow: 0 0 10px #7b2cbf, 0 0 20px #7b2cbf; }
+    .timer { font-size: 1.8em; color: #e0e0e0; margin: 10px 0; transition: color 0.3s; text-shadow: 0 0 5px #000; }
     .blink-warning { animation: blink 1s infinite; }
-    @keyframes blink { 50% { color: #dc3545; } }
-    .feedback { font-size: 1.2em; font-weight: bold; height: 25px; margin: 10px 0; }
-    .feedback.correct { color: #28a745; }
-    .feedback.incorrect { color: #dc3545; }
-    .answer-options { display: flex; gap: 20px; justify-content: center; }
+    @keyframes blink { 50% { color: #ff005d; text-shadow: 0 0 10px #ff005d; } }
+    .feedback { font-size: 1.2em; font-weight: bold; height: 25px; margin: 10px 0; transition: all 0.3s; }
+    .feedback.correct { color: #00ff88; text-shadow: 0 0 8px #00ff88; }
+    .feedback.incorrect { color: #ff4d4d; text-shadow: 0 0 8px #ff4d4d; }
+    .answer-options { display: flex; gap: 20px; justify-content: center; margin-top: 20px; }
     .answer-btn {
-        width: 80px; height: 80px; border: 3px solid #5a189a; background-color: white; border-radius: 10px;
-        font-size: 2em; font-weight: bold; color: #333; cursor: pointer; transition: all 0.2s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        width: 90px; height: 90px; border: 2px solid rgba(0, 255, 255, 0.5); background: rgba(10, 10, 30, 0.5);
+        border-radius: 10px; font-size: 2.5em; font-weight: bold; color: #e0e0e0; cursor: pointer;
+        transition: all 0.2s ease;
     }
-    .answer-btn:hover { background-color: #5a189a; color: white; transform: translateY(-5px); }
+    .answer-btn:hover { background: rgba(0, 255, 255, 0.2); color: white; border-color: #00ffff; transform: translateY(-5px) scale(1.05); box-shadow: 0 0 15px #00ffff; }
     .final-message {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.9);
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(12, 10, 31, 0.9); backdrop-filter: blur(5px);
         display: none; justify-content: center; align-items: center; flex-direction: column;
-        font-size: 4em; font-weight: bold; border-radius: 12px; text-align: center;
+        font-size: 4em; font-weight: bold; border-radius: 12px; text-align: center; text-transform: uppercase;
     }
-    .final-message small { font-size: 0.4em; margin-top: 10px; }
-    .final-message.win { color: #28a745; }
-    .final-message.lose { color: #dc3545; }
+    .final-message small { font-size: 0.5em; margin-top: 10px; font-weight: 400; }
+    .final-message.win { color: #00ff88; text-shadow: 0 0 20px #00ff88; }
+    .final-message.lose { color: #ff4d4d; text-shadow: 0 0 20px #ff4d4d; }
   </style>
 </head>
 <body>
+  
+  <div class="stars-container" id="stars-container"></div>
+
   <div id="menu-container">
     <h1>Lucha contra Don Mate</h1>
     <div class="instructions">
@@ -137,20 +196,22 @@
         <input type="radio" id="dificil" name="difficulty" value="dificil"><label for="dificil">Difícil</label>
         <input type="radio" id="hardcore" name="difficulty" value="hardcore"><label for="hardcore">Hardcore</label>
     </div>
-    <button id="startGameBtn">Iniciar Juego</button>
+    <button id="startGameBtn">Iniciar Batalla</button>
   </div>
+  
   <div id="game-container" class="game-container hidden">
+    <div id="attackFlash" class="attack-flash"></div>
     <div id="scoreDisplay" class="score-display"></div>
     <div class="character-info player">
         <h2>Tú</h2><div class="health-bar-container"><div id="playerLifeBar" class="health-bar-fill player"></div></div>
         <p class="hp-text" id="playerHpText"></p>
     </div>
-    <div id="playerCharacter" class="character-container player-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="50,5 95,25 95,75 50,95 5,75 5,25" style="fill:none;stroke:#007bff;stroke-width:8" /><circle cx="35" cy="40" r="8" style="fill:none;stroke:#007bff;stroke-width:8" /><circle cx="65" cy="40" r="8" style="fill:none;stroke:#007bff;stroke-width:8" /></svg></div>
+    <div id="playerCharacter" class="character-container player-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="50,5 95,25 95,75 50,95 5,75 5,25" style="fill:none;stroke:currentColor;stroke-width:8" /><circle cx="35" cy="40" r="8" style="fill:none;stroke:currentColor;stroke-width:8" /><circle cx="65" cy="40" r="8" style="fill:none;stroke:currentColor;stroke-width:8" /></svg></div>
     <div class="character-info enemy">
         <h2>Don Mate</h2><div class="health-bar-container"><div id="bossLifeBar" class="health-bar-fill enemy"></div></div>
         <p class="hp-text" id="bossHpText"></p>
     </div>
-    <div id="enemyCharacter" class="character-container enemy-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="5" y="5" width="90" height="90" style="fill:none;stroke:#c50000;stroke-width:8" /><circle cx="68" cy="45" r="10" style="fill:none;stroke:#c50000;stroke-width:8" /><line x1="22" y1="35" x2="48" y2="55" style="stroke:#c50000;stroke-width:8" /><line x1="48" y1="35" x2="22" y2="55" style="stroke:#c50000;stroke-width:8" /></svg></div>
+    <div id="enemyCharacter" class="character-container enemy-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="5" y="5" width="90" height="90" style="fill:none;stroke:currentColor;stroke-width:8" /><circle cx="68" cy="45" r="10" style="fill:none;stroke:currentColor;stroke-width:8" /><line x1="22" y1="35" x2="48" y2="55" style="stroke:currentColor;stroke-width:8" /><line x1="48" y1="35" x2="22" y2="55" style="stroke:currentColor;stroke-width:8" /></svg></div>
     <div id="villainSpeechBubble" class="speech-bubble"></div>
     <div class="game-ui">
         <p class="question" id="question"></p><p class="timer" id="timer"></p><p class="feedback" id="feedback"></p>
@@ -160,6 +221,17 @@
   </div>
 
   <script>
+    const starsContainer = document.getElementById('stars-container');
+    const starCount = 200;
+    for (let i = 0; i < starCount; i++) {
+        const star = document.createElement('div'); star.className = 'star';
+        const size = Math.random() * 3; star.style.width = `${size}px`; star.style.height = `${size}px`;
+        star.style.top = `${Math.random() * -100}vh`; star.style.left = `${Math.random() * 100}vw`;
+        const duration = Math.random() * 5 + 3; const delay = Math.random() * 5;
+        star.style.animationDuration = `${duration}s`; star.style.animationDelay = `${delay}s`;
+        starsContainer.appendChild(star);
+    }
+
     const Game = {
         config: {
             maxHp: 100,
@@ -167,10 +239,7 @@
             damageValues: { playerAttack: 25, enemyWrongAnswer: 20, enemyTimeout: 15 },
             pointsValues: { baseCorrect: 10, penaltyWrongAnswer: 5, penaltyTimeout: 10 },
             trashTalkFrequency: 2,
-            villainTaunts: [
-                "¡Casi lo tienes!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!",
-                "¿Necesitas una calculadora? Jeje", "¡Uy, esa no era!", "¡Piensa un poco más!"
-            ]
+            villainTaunts: ["¡Casi!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!", "¿Calculadora? Jeje", "¡Uy, esa no era!"]
         },
         state: {
             playerHp: 0, bossHp: 0, score: 0, failureCounter: 0, timeLeft: 0,
@@ -183,6 +252,7 @@
                 menuContainer: document.getElementById('menu-container'),
                 gameContainer: document.getElementById('game-container'),
                 startGameBtn: document.getElementById('startGameBtn'),
+                attackFlash: document.getElementById('attackFlash'),
                 scoreDisplay: document.getElementById('scoreDisplay'),
                 playerLifeBar: document.getElementById('playerLifeBar'),
                 bossLifeBar: document.getElementById('bossLifeBar'),
@@ -211,11 +281,7 @@
             this.elements.gameContainer.classList.remove('hidden');
             this.newQuestion();
         },
-        newQuestion() {
-            this.generateQuestion();
-            this.startTimer();
-            this.render();
-        },
+        newQuestion() { this.generateQuestion(); this.startTimer(); this.render(); },
         generateQuestion() {
             const a = Math.floor(Math.random() * 20) + 1;
             const b = Math.floor(Math.random() * 20) + 1;
@@ -231,13 +297,22 @@
                 const pointsEarned = this.config.pointsValues.baseCorrect + this.state.timeLeft;
                 this.state.score += pointsEarned;
                 this.state.bossHp = Math.max(0, this.state.bossHp - this.config.damageValues.playerAttack);
-                this.state.feedbackText = `¡Correcto! +${pointsEarned} puntos`;
+                this.state.feedbackText = `¡IMPACTO CRÍTICO! +${pointsEarned} puntos`;
                 this.state.feedbackClass = 'correct';
+                
                 this.triggerShake(this.elements.enemyCharacter);
+                this.elements.attackFlash.classList.add('active');
+                this.elements.enemyCharacter.classList.add('hit-effect');
+                
+                setTimeout(() => {
+                    this.elements.attackFlash.classList.remove('active');
+                    this.elements.enemyCharacter.classList.remove('hit-effect'); 
+                }, 500);
+
             } else {
                 this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyWrongAnswer);
                 this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyWrongAnswer);
-                this.state.feedbackText = `¡Incorrecto! -${this.config.pointsValues.penaltyWrongAnswer} puntos`;
+                this.state.feedbackText = `¡FALLO! -${this.config.pointsValues.penaltyWrongAnswer} puntos`;
                 this.state.feedbackClass = 'incorrect';
                 this.handleFailure();
                 this.triggerShake(this.elements.playerCharacter);
@@ -251,7 +326,7 @@
             this.state.gameActive = false;
             this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyTimeout);
             this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyTimeout);
-            this.state.feedbackText = `¡Se acabó el tiempo! -${this.config.pointsValues.penaltyTimeout} puntos`;
+            this.state.feedbackText = `¡TIEMPO AGOTADO! -${this.config.pointsValues.penaltyTimeout} puntos`;
             this.state.feedbackClass = 'incorrect';
             this.handleFailure();
             this.triggerShake(this.elements.playerCharacter);
@@ -271,23 +346,15 @@
                 setTimeout(() => { this.state.gameActive = true; this.newQuestion(); }, 1200);
             }
         },
-        endGame() {
-            this.state.gameActive = false;
-            clearInterval(this.state.timer);
-            this.render();
-        },
+        endGame() { this.state.gameActive = false; clearInterval(this.state.timer); this.render(); },
         startTimer() {
             this.state.timeLeft = this.state.gameTimeLimit;
             this.state.timer = setInterval(() => {
                 this.state.timeLeft--;
-                if (this.state.timeLeft < 0) { // Usar < 0 para evitar que se ejecute en el segundo 0
-                    this.handleTimeout();
-                } else {
-                    this.render();
-                }
+                if (this.state.timeLeft < 0) { this.handleTimeout(); }
+                else { this.render(); }
             }, 1000);
         },
-        // --- SECCIÓN CORREGIDA ---
         render() {
             this.elements.playerLifeBar.style.width = `${(this.state.playerHp / this.config.maxHp) * 100}%`;
             this.elements.bossLifeBar.style.width = `${(this.state.bossHp / this.config.maxHp) * 100}%`;
@@ -299,8 +366,6 @@
             this.elements.timer.textContent = `Tiempo: ${this.state.timeLeft}s`;
             this.elements.timer.classList.toggle('blink-warning', this.state.timeLeft <= 5 && this.state.gameActive);
             
-            // CORRECCIÓN: El bloque para renderizar los botones ahora está ANTES de actualizar el texto de la pregunta.
-            // Esto asegura que la comparación del texto viejo (en el DOM) con el nuevo (en el estado) funcione correctamente.
             if (this.elements.question.textContent !== this.state.currentQuestionText) {
                 let options = [this.state.currentCorrectAnswer];
                  while (options.length < 3) {
@@ -317,14 +382,11 @@
                     this.elements.answerOptions.appendChild(button);
                 });
             }
-
-            // Esta línea ahora está DESPUÉS del bloque de los botones.
             this.elements.question.textContent = this.state.currentQuestionText;
-            
             if (!this.state.gameActive && (this.state.playerHp <= 0 || this.state.bossHp <= 0)) {
                 const playerWon = this.state.bossHp <= 0;
                 this.elements.finalMessage.style.display = 'flex';
-                this.elements.finalMessage.innerHTML = `${playerWon ? '¡HAS GANADO!' : '¡HAS PERDIDO!'}<br><small>Puntaje Final: ${this.state.score}</small>`;
+                this.elements.finalMessage.innerHTML = `${playerWon ? '¡VICTORIA!' : '¡DERROTA!'}<br><small>Puntaje Final: ${this.state.score}</small>`;
                 this.elements.finalMessage.className = `final-message ${playerWon ? 'win' : 'lose'}`;
             }
         },
