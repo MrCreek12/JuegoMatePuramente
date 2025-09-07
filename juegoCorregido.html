@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lucha contra Don Mate v8.1 (Corregido)</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f4f4f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .hidden { display: none !important; }
+
+    /* --- ESTILOS DEL MENÚ --- */
+    #menu-container {
+        display: flex; flex-direction: column; align-items: center; text-align: center;
+        background-color: white; padding: 40px; border-radius: 15px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1); max-width: 500px;
+    }
+    #menu-container h1 { color: #5a189a; margin-top: 0; }
+    .instructions {
+        width: 90%; text-align: left; margin: 15px 0; padding: 15px;
+        border: 2px solid #e0e0e0; border-radius: 10px;
+    }
+    .instructions h3 { text-align: center; margin-top: 0; color: #333; }
+    .instructions ul { padding-left: 20px; margin-bottom: 0; }
+    .instructions li { margin-bottom: 8px; }
+    .difficulty-options { display: flex; gap: 15px; margin: 20px 0; }
+    .difficulty-options label {
+        padding: 10px 20px; border: 2px solid #ccc; border-radius: 8px;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .difficulty-options input { display: none; }
+    .difficulty-options input:checked + label {
+        background-color: #5a189a; color: white; border-color: #5a189a;
+    }
+    #startGameBtn {
+        padding: 15px 30px; font-size: 1.2em; font-weight: bold; color: white;
+        background-color: #28a745; border: none; border-radius: 10px;
+        cursor: pointer; transition: background-color 0.2s;
+    }
+    #startGameBtn:hover { background-color: #218838; }
+
+    /* --- ESTILOS DEL JUEGO --- */
+    .game-container {
+      width: 800px; height: 550px; background-color: white; border: 2px solid #333;
+      border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      position: relative; box-sizing: border-box; padding: 20px; overflow: hidden;
+    }
+    .score-display {
+        position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+        font-size: 1.8em; font-weight: bold; color: #5a189a;
+    }
+    .character-info { position: absolute; top: 60px; width: 300px; }
+    .character-info.player { left: 40px; }
+    .character-info.enemy { right: 40px; text-align: right; }
+    .character-info h2 { margin: 0 0 5px 0; font-size: 1.2em; }
+    .health-bar-container {
+      width: 100%; height: 28px; border: 3px solid #333;
+      border-radius: 15px; background-color: #e0e0e0; overflow: hidden;
+    }
+    .health-bar-fill { height: 100%; transition: width 0.5s ease-in-out; border-radius: 12px 0 0 12px; }
+    .health-bar-fill.player { background-color: #007bff; }
+    .health-bar-fill.enemy { background-color: #dc3545; }
+    .hp-text { font-weight: bold; margin-top: 5px; }
+    .character-container { position: absolute; top: 170px; width: 100px; height: 100px; }
+    .player-character { left: 100px; animation: movePlayer 3.5s infinite alternate ease-in-out; }
+    .enemy-character { right: 150px; animation: moveEnemy 3s infinite alternate ease-in-out; }
+    @keyframes movePlayer { from { transform: translateX(0px); } to { transform: translateX(-20px); } }
+    @keyframes moveEnemy { from { transform: translateX(0px); } to { transform: translateX(40px); } }
+    .shake { animation: shake 0.5s; }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+        20%, 40%, 60%, 80% { transform: translateX(8px); }
+    }
+    .speech-bubble {
+        position: absolute; top: 130px; right: 260px; background-color: #f1f1f1; padding: 15px;
+        border-radius: 10px; border: 2px solid #333; font-weight: bold; opacity: 0; visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s; transform: translateY(10px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); z-index: 10;
+    }
+    .speech-bubble.visible { opacity: 1; visibility: visible; transform: translateY(0); }
+    .speech-bubble::after {
+        content: ''; position: absolute; bottom: 50%; right: -12px; margin-top: -6px;
+        border-width: 6px; border-style: solid; border-color: transparent transparent transparent #333;
+    }
+    .game-ui {
+        position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+        text-align: center; width: 90%;
+    }
+    .question { font-size: 2.5em; font-weight: bold; color: #5a189a; margin: 0; }
+    .timer { font-size: 1.5em; color: #333; margin: 10px 0; transition: color 0.3s; }
+    .blink-warning { animation: blink 1s infinite; }
+    @keyframes blink { 50% { color: #dc3545; } }
+    .feedback { font-size: 1.2em; font-weight: bold; height: 25px; margin: 10px 0; }
+    .feedback.correct { color: #28a745; }
+    .feedback.incorrect { color: #dc3545; }
+    .answer-options { display: flex; gap: 20px; justify-content: center; }
+    .answer-btn {
+        width: 80px; height: 80px; border: 3px solid #5a189a; background-color: white; border-radius: 10px;
+        font-size: 2em; font-weight: bold; color: #333; cursor: pointer; transition: all 0.2s;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .answer-btn:hover { background-color: #5a189a; color: white; transform: translateY(-5px); }
+    .final-message {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.9);
+        display: none; justify-content: center; align-items: center; flex-direction: column;
+        font-size: 4em; font-weight: bold; border-radius: 12px; text-align: center;
+    }
+    .final-message small { font-size: 0.4em; margin-top: 10px; }
+    .final-message.win { color: #28a745; }
+    .final-message.lose { color: #dc3545; }
+  </style>
+</head>
+<body>
+  <div id="menu-container">
+    <h1>Lucha contra Don Mate</h1>
+    <div class="instructions">
+        <h3>Cómo Jugar</h3>
+        <ul>
+            <li>Resuelve la suma antes de que se acabe el tiempo.</li>
+            <li>¡Si aciertas, atacas a Don Mate!</li>
+            <li>¡Si fallas o se agota el tiempo, recibirás daño!</li>
+            <li>¡Entre más rápido respondas, más puntos ganas!</li>
+        </ul>
+    </div>
+    <h2>Elige la dificultad:</h2>
+    <div class="difficulty-options">
+        <input type="radio" id="facil" name="difficulty" value="facil"><label for="facil">Fácil</label>
+        <input type="radio" id="medio" name="difficulty" value="medio" checked><label for="medio">Medio</label>
+        <input type="radio" id="dificil" name="difficulty" value="dificil"><label for="dificil">Difícil</label>
+        <input type="radio" id="hardcore" name="difficulty" value="hardcore"><label for="hardcore">Hardcore</label>
+    </div>
+    <button id="startGameBtn">Iniciar Juego</button>
+  </div>
+  <div id="game-container" class="game-container hidden">
+    <div id="scoreDisplay" class="score-display"></div>
+    <div class="character-info player">
+        <h2>Tú</h2><div class="health-bar-container"><div id="playerLifeBar" class="health-bar-fill player"></div></div>
+        <p class="hp-text" id="playerHpText"></p>
+    </div>
+    <div id="playerCharacter" class="character-container player-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="50,5 95,25 95,75 50,95 5,75 5,25" style="fill:none;stroke:#007bff;stroke-width:8" /><circle cx="35" cy="40" r="8" style="fill:none;stroke:#007bff;stroke-width:8" /><circle cx="65" cy="40" r="8" style="fill:none;stroke:#007bff;stroke-width:8" /></svg></div>
+    <div class="character-info enemy">
+        <h2>Don Mate</h2><div class="health-bar-container"><div id="bossLifeBar" class="health-bar-fill enemy"></div></div>
+        <p class="hp-text" id="bossHpText"></p>
+    </div>
+    <div id="enemyCharacter" class="character-container enemy-character"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="5" y="5" width="90" height="90" style="fill:none;stroke:#c50000;stroke-width:8" /><circle cx="68" cy="45" r="10" style="fill:none;stroke:#c50000;stroke-width:8" /><line x1="22" y1="35" x2="48" y2="55" style="stroke:#c50000;stroke-width:8" /><line x1="48" y1="35" x2="22" y2="55" style="stroke:#c50000;stroke-width:8" /></svg></div>
+    <div id="villainSpeechBubble" class="speech-bubble"></div>
+    <div class="game-ui">
+        <p class="question" id="question"></p><p class="timer" id="timer"></p><p class="feedback" id="feedback"></p>
+        <div class="answer-options" id="answerOptions"></div>
+    </div>
+    <div id="finalMessage" class="final-message"></div>
+  </div>
+
+  <script>
+    const Game = {
+        config: {
+            maxHp: 100,
+            timeLimits: { facil: 30, medio: 15, dificil: 10, hardcore: 6 },
+            damageValues: { playerAttack: 25, enemyWrongAnswer: 20, enemyTimeout: 15 },
+            pointsValues: { baseCorrect: 10, penaltyWrongAnswer: 5, penaltyTimeout: 10 },
+            trashTalkFrequency: 2,
+            villainTaunts: [
+                "¡Casi lo tienes!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!",
+                "¿Necesitas una calculadora? Jeje", "¡Uy, esa no era!", "¡Piensa un poco más!"
+            ]
+        },
+        state: {
+            playerHp: 0, bossHp: 0, score: 0, failureCounter: 0, timeLeft: 0,
+            gameTimeLimit: 0, currentCorrectAnswer: null, currentQuestionText: "",
+            feedbackText: "", feedbackClass: "", gameActive: false, timer: null, speechBubbleTimeout: null
+        },
+        elements: {},
+        init() {
+            this.elements = {
+                menuContainer: document.getElementById('menu-container'),
+                gameContainer: document.getElementById('game-container'),
+                startGameBtn: document.getElementById('startGameBtn'),
+                scoreDisplay: document.getElementById('scoreDisplay'),
+                playerLifeBar: document.getElementById('playerLifeBar'),
+                bossLifeBar: document.getElementById('bossLifeBar'),
+                playerHpText: document.getElementById('playerHpText'),
+                bossHpText: document.getElementById('bossHpText'),
+                question: document.getElementById('question'),
+                timer: document.getElementById('timer'),
+                feedback: document.getElementById('feedback'),
+                answerOptions: document.getElementById('answerOptions'),
+                finalMessage: document.getElementById('finalMessage'),
+                playerCharacter: document.getElementById('playerCharacter'),
+                enemyCharacter: document.getElementById('enemyCharacter'),
+                villainSpeechBubble: document.getElementById('villainSpeechBubble')
+            };
+            this.elements.startGameBtn.addEventListener('click', () => this.startGame());
+        },
+        startGame() {
+            const selectedDifficulty = document.querySelector('input[name="difficulty"]:checked').value;
+            this.state.gameTimeLimit = this.config.timeLimits[selectedDifficulty];
+            this.state.playerHp = this.config.maxHp;
+            this.state.bossHp = this.config.maxHp;
+            this.state.score = 0;
+            this.state.failureCounter = 0;
+            this.state.gameActive = true;
+            this.elements.menuContainer.classList.add('hidden');
+            this.elements.gameContainer.classList.remove('hidden');
+            this.newQuestion();
+        },
+        newQuestion() {
+            this.generateQuestion();
+            this.startTimer();
+            this.render();
+        },
+        generateQuestion() {
+            const a = Math.floor(Math.random() * 20) + 1;
+            const b = Math.floor(Math.random() * 20) + 1;
+            this.state.currentCorrectAnswer = a + b;
+            this.state.currentQuestionText = `${a} + ${b}`;
+            this.state.feedbackText = "";
+        },
+        handleAnswer(selectedAnswer) {
+            if (!this.state.gameActive) return;
+            this.state.gameActive = false;
+            clearInterval(this.state.timer);
+            if (selectedAnswer === this.state.currentCorrectAnswer) {
+                const pointsEarned = this.config.pointsValues.baseCorrect + this.state.timeLeft;
+                this.state.score += pointsEarned;
+                this.state.bossHp = Math.max(0, this.state.bossHp - this.config.damageValues.playerAttack);
+                this.state.feedbackText = `¡Correcto! +${pointsEarned} puntos`;
+                this.state.feedbackClass = 'correct';
+                this.triggerShake(this.elements.enemyCharacter);
+            } else {
+                this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyWrongAnswer);
+                this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyWrongAnswer);
+                this.state.feedbackText = `¡Incorrecto! -${this.config.pointsValues.penaltyWrongAnswer} puntos`;
+                this.state.feedbackClass = 'incorrect';
+                this.handleFailure();
+                this.triggerShake(this.elements.playerCharacter);
+            }
+            this.render();
+            this.checkGameStatus();
+        },
+        handleTimeout() {
+            clearInterval(this.state.timer);
+            if (!this.state.gameActive) return;
+            this.state.gameActive = false;
+            this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyTimeout);
+            this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyTimeout);
+            this.state.feedbackText = `¡Se acabó el tiempo! -${this.config.pointsValues.penaltyTimeout} puntos`;
+            this.state.feedbackClass = 'incorrect';
+            this.handleFailure();
+            this.triggerShake(this.elements.playerCharacter);
+            this.render();
+            this.checkGameStatus();
+        },
+        handleFailure() {
+            this.state.failureCounter++;
+            if (this.state.failureCounter % this.config.trashTalkFrequency === 0) {
+                this.villainTalk();
+            }
+        },
+        checkGameStatus() {
+            if (this.state.bossHp <= 0 || this.state.playerHp <= 0) {
+                setTimeout(() => this.endGame(), 500);
+            } else {
+                setTimeout(() => { this.state.gameActive = true; this.newQuestion(); }, 1200);
+            }
+        },
+        endGame() {
+            this.state.gameActive = false;
+            clearInterval(this.state.timer);
+            this.render();
+        },
+        startTimer() {
+            this.state.timeLeft = this.state.gameTimeLimit;
+            this.state.timer = setInterval(() => {
+                this.state.timeLeft--;
+                if (this.state.timeLeft < 0) { // Usar < 0 para evitar que se ejecute en el segundo 0
+                    this.handleTimeout();
+                } else {
+                    this.render();
+                }
+            }, 1000);
+        },
+        // --- SECCIÓN CORREGIDA ---
+        render() {
+            this.elements.playerLifeBar.style.width = `${(this.state.playerHp / this.config.maxHp) * 100}%`;
+            this.elements.bossLifeBar.style.width = `${(this.state.bossHp / this.config.maxHp) * 100}%`;
+            this.elements.playerHpText.textContent = `${this.state.playerHp} / ${this.config.maxHp}`;
+            this.elements.bossHpText.textContent = `${this.state.bossHp} / ${this.config.maxHp}`;
+            this.elements.scoreDisplay.textContent = `Puntaje: ${this.state.score}`;
+            this.elements.feedback.textContent = this.state.feedbackText;
+            this.elements.feedback.className = `feedback ${this.state.feedbackClass}`;
+            this.elements.timer.textContent = `Tiempo: ${this.state.timeLeft}s`;
+            this.elements.timer.classList.toggle('blink-warning', this.state.timeLeft <= 5 && this.state.gameActive);
+            
+            // CORRECCIÓN: El bloque para renderizar los botones ahora está ANTES de actualizar el texto de la pregunta.
+            // Esto asegura que la comparación del texto viejo (en el DOM) con el nuevo (en el estado) funcione correctamente.
+            if (this.elements.question.textContent !== this.state.currentQuestionText) {
+                let options = [this.state.currentCorrectAnswer];
+                 while (options.length < 3) {
+                    let wrongAnswer = this.state.currentCorrectAnswer + (Math.floor(Math.random() * 10) - 5);
+                    if (wrongAnswer !== this.state.currentCorrectAnswer && !options.includes(wrongAnswer) && wrongAnswer > 0) options.push(wrongAnswer);
+                }
+                options.sort(() => Math.random() - 0.5);
+                this.elements.answerOptions.innerHTML = '';
+                options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'answer-btn';
+                    button.textContent = option;
+                    button.onclick = () => this.handleAnswer(option);
+                    this.elements.answerOptions.appendChild(button);
+                });
+            }
+
+            // Esta línea ahora está DESPUÉS del bloque de los botones.
+            this.elements.question.textContent = this.state.currentQuestionText;
+            
+            if (!this.state.gameActive && (this.state.playerHp <= 0 || this.state.bossHp <= 0)) {
+                const playerWon = this.state.bossHp <= 0;
+                this.elements.finalMessage.style.display = 'flex';
+                this.elements.finalMessage.innerHTML = `${playerWon ? '¡HAS GANADO!' : '¡HAS PERDIDO!'}<br><small>Puntaje Final: ${this.state.score}</small>`;
+                this.elements.finalMessage.className = `final-message ${playerWon ? 'win' : 'lose'}`;
+            }
+        },
+        villainTalk() {
+            clearTimeout(this.state.speechBubbleTimeout);
+            const taunt = this.config.villainTaunts[Math.floor(Math.random() * this.config.villainTaunts.length)];
+            this.elements.villainSpeechBubble.textContent = taunt;
+            this.elements.villainSpeechBubble.classList.add('visible');
+            this.state.speechBubbleTimeout = setTimeout(() => {
+                this.elements.villainSpeechBubble.classList.remove('visible');
+            }, 3500);
+        },
+        triggerShake(element) {
+            element.classList.add('shake');
+            setTimeout(() => element.classList.remove('shake'), 500);
+        }
+    };
+    document.addEventListener('DOMContentLoaded', () => Game.init());
+  </script>
+</body>
+</html>
