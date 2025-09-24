@@ -8,6 +8,49 @@ document.addEventListener('DOMContentLoaded', () => {
   // Función de ayuda para crear pausas
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Función para extraer user_id de la URL
+  const getUserId = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user_id');
+    
+    if (userId) {
+      console.log('Usuario logueado:', userId);
+      // Aquí puedes usar el user_id para:
+      // - Guardar progreso del usuario
+      // - Personalizar la experiencia
+      // - Enviar estadísticas al backend
+      return userId;
+    } else {
+      console.log('Usuario no identificado');
+      return null;
+    }
+  };
+
+  // Llamar la función cuando cargue el juego
+  const currentUserId = getUserId();
+
+  // Funciones para el indicador de envío de datos
+  const showDataSendingIndicator = () => {
+    const overlay = document.getElementById('data-sending-overlay');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+    }
+  };
+
+  const hideDataSendingIndicator = () => {
+    const overlay = document.getElementById('data-sending-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+    }
+  };
+
+  const updateLoadingText = (text) => {
+    const loadingText = document.getElementById('loading-text');
+    if (loadingText) {
+      loadingText.textContent = text;
+    }
+  };
+
   // =========================================================================
   // === DEFINICIÓN DE PREGUNTAS Y DATOS DEL JUEGO =========================
   // =========================================================================
@@ -45,38 +88,54 @@ document.addEventListener('DOMContentLoaded', () => {
       maxHp: 100,
       timeLimits: { facil: 30, medio: 15, dificil: 10, hardcore: 6 },
       damageValues: { playerAttack: 25, enemyWrongAnswer: 20, enemyTimeout: 15 },
-      pointsValues: { baseCorrect: 10, penaltyWrongAnswer: 5, penaltyTimeout: 10 },
+      pointsValues: { 
+        baseCorrect: 10,      // Puntaje base por respuesta correcta
+        baseIncorrect: 0,     // Sin puntos por respuestas incorrectas
+        rapidBonus: 2,        // Bonus por responder en menos de 2 segundos
+        streakBonus: 5,       // Bonus por racha de 3 correctas seguidas
+        completionBonus: 10   // Bonus por completar el juego
+      },
       trashTalkFrequency: 2,
       villainTaunts: ["¡Casi!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!", "¿Calculadora? Jeje", "¡Uy, esa no era!"]
     },
 
-    state: {
-      playerHp: 0,
-      bossHp: 0,
-      score: 0,
-      failureCounter: 0,
-      timeLeft: 0,
-      gameTimeLimit: 0,
-      currentCorrectAnswer: null,
-      currentQuestionOptions: [],
-      gameActive: false,
-      isPaused: false, // NUEVO: Estado para controlar la pausa
-      timer: null,
-      speechBubbleTimeout: null,
-      questions: [],
-      currentQuestionIndex: 0,
-      correctAnswersCount: 0,
-      incorrectAnswersCount: 0,
-      gameStartTime: null,
-      gameEndTime: null
-    },
-
-    elements: {},
+      state: {
+        playerHp: 0,
+        bossHp: 0,
+        score: 0,
+        failureCounter: 0,
+        timeLeft: 0,
+        gameTimeLimit: 0,
+        currentCorrectAnswer: null,
+        currentQuestionOptions: [],
+        gameActive: false,
+        isPaused: false, // NUEVO: Estado para controlar la pausa
+        timer: null,
+        speechBubbleTimeout: null,
+        questions: [],
+        currentQuestionIndex: 0,
+        correctAnswersCount: 0,
+        incorrectAnswersCount: 0,
+        totalQuestionsPresented: 0, // NUEVO: Contador del total de preguntas mostradas
+        gameStartTime: null,
+        gameEndTime: null,
+        // NUEVO: Variables para el sistema de puntaje
+        consecutiveCorrectAnswers: 0, // Contador de respuestas correctas consecutivas
+        answerStartTime: null, // Tiempo cuando se mostró la pregunta
+        gameCompleted: false // Indica si el juego se completó (jugador ganó)
+      },    elements: {},
 
     init() {
       this.cacheDOMElements();
       this.bindEvents();
       this.createStars(200);
+      
+      // Mostrar user_id actual para debugging
+      if (currentUserId) {
+        console.log(`🎮 Usuario actual: ${currentUserId}`);
+      } else {
+        console.log('⚠️  No se encontró user_id en la URL. Los datos del juego no se enviarán a la API.');
+      }
     },
 
     cacheDOMElements() {
@@ -106,7 +165,9 @@ document.addEventListener('DOMContentLoaded', () => {
         countdownOverlay: document.getElementById('countdown-overlay'),
         countdownText: document.getElementById('countdown-text'),
         gameUi: document.querySelector('.game-ui'),
-        gameHeader: document.getElementById('game-header')
+        gameHeader: document.getElementById('game-header'),
+        dataSendingOverlay: document.getElementById('data-sending-overlay'),
+        loadingText: document.getElementById('loading-text')
       };
     },
 
@@ -126,9 +187,14 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.failureCounter = 0;
       this.state.correctAnswersCount = 0;
       this.state.incorrectAnswersCount = 0;
+      this.state.totalQuestionsPresented = 0; // NUEVO: Resetear contador de preguntas mostradas
       this.state.gameStartTime = null;
       this.state.gameEndTime = null;
       this.state.isPaused = false; // NUEVO: Asegurarse que el juego no inicie en pausa
+      // NUEVO: Resetear variables del sistema de puntaje
+      this.state.consecutiveCorrectAnswers = 0;
+      this.state.answerStartTime = null;
+      this.state.gameCompleted = false;
 
       this.state.gameActive = false;
       this.elements.finalMessage.style.display = 'none';
@@ -199,6 +265,10 @@ document.addEventListener('DOMContentLoaded', () => {
       this.renderNewQuestion();
       this.updateUI();
       this.startTimer();
+      // NUEVO: Incrementar contador de preguntas mostradas
+      this.state.totalQuestionsPresented++;
+      // NUEVO: Registrar el tiempo cuando se muestra la pregunta
+      this.state.answerStartTime = Date.now();
     },
 
     generateQuestionData() {
@@ -228,20 +298,51 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     handleCorrectAnswer() {
-      const pointsEarned = this.config.pointsValues.baseCorrect + this.state.timeLeft;
+      // Calcular tiempo de respuesta
+      const responseTime = (Date.now() - this.state.answerStartTime) / 1000;
+      
+      // Puntaje base
+      let pointsEarned = this.config.pointsValues.baseCorrect;
+      let bonusMessages = [];
+      
+      // Bonus por rapidez (menos de 2 segundos)
+      if (responseTime < 2) {
+        pointsEarned += this.config.pointsValues.rapidBonus;
+        bonusMessages.push(`¡RAPIDEZ! +${this.config.pointsValues.rapidBonus}`);
+      }
+      
+      // Incrementar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers++;
+      
+      // Bonus por racha (cada 3 respuestas seguidas correctas)
+      if (this.state.consecutiveCorrectAnswers % 3 === 0) {
+        pointsEarned += this.config.pointsValues.streakBonus;
+        bonusMessages.push(`¡RACHA x3! +${this.config.pointsValues.streakBonus}`);
+      }
+      
       this.state.score += pointsEarned;
       this.state.bossHp = Math.max(0, this.state.bossHp - this.config.damageValues.playerAttack);
       this.state.correctAnswersCount++;
-      this.elements.feedback.textContent = `¡IMPACTO CRÍTICO! +${pointsEarned} puntos`;
+      
+      // Mensaje de feedback con bonificaciones
+      let feedbackText = `¡IMPACTO CRÍTICO! +${this.config.pointsValues.baseCorrect} puntos`;
+      if (bonusMessages.length > 0) {
+        feedbackText += ` (${bonusMessages.join(', ')})`;
+      }
+      
+      this.elements.feedback.textContent = feedbackText;
       this.elements.feedback.className = 'feedback correct';
       this.triggerEffect('attack');
     },
 
     handleIncorrectAnswer() {
-      this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyWrongAnswer);
+      // Reiniciar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers = 0;
+      
+      // Sin penalización de puntos, solo 0 puntos por respuesta incorrecta
       this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyWrongAnswer);
       this.state.incorrectAnswersCount++;
-      this.elements.feedback.textContent = `¡FALLO! -${this.config.pointsValues.penaltyWrongAnswer} puntos`;
+      this.elements.feedback.textContent = `¡FALLO! +0 puntos`;
       this.elements.feedback.className = 'feedback incorrect';
       this.handleFailure();
       this.triggerEffect('playerHit');
@@ -253,10 +354,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!this.state.gameActive) return;
       this.state.gameActive = false;
 
-      this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyTimeout);
+      // Reiniciar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers = 0;
+      
+      // Sin penalización de puntos, solo 0 puntos por timeout
       this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyTimeout);
       this.state.incorrectAnswersCount++;
-      this.elements.feedback.textContent = `¡TIEMPO AGOTADO! -${this.config.pointsValues.penaltyTimeout} puntos`;
+      this.elements.feedback.textContent = `¡TIEMPO AGOTADO! +0 puntos`;
       this.elements.feedback.className = 'feedback incorrect';
       this.handleFailure();
       this.triggerEffect('playerHit');
@@ -272,7 +376,13 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     checkGameStatus() {
-      if (this.state.bossHp <= 0 || this.state.playerHp <= 0) {
+      if (this.state.bossHp <= 0) {
+        // El jugador ganó - marcar como completado para el bonus
+        this.state.gameCompleted = true;
+        setTimeout(() => this.endGame(), 500);
+      } else if (this.state.playerHp <= 0) {
+        // El jugador perdió
+        this.state.gameCompleted = false;
         setTimeout(() => this.endGame(), 500);
       } else {
         setTimeout(() => {
@@ -287,6 +397,13 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(this.state.timer);
       this.state.gameEndTime = Date.now();
       this.elements.pauseBtn.classList.add('hidden'); // NUEVO: Ocultar botón de pausa
+      
+      // Aplicar bonus por completar el juego si el jugador ganó
+      if (this.state.gameCompleted) {
+        this.state.score += this.config.pointsValues.completionBonus;
+        console.log(`¡BONUS POR COMPLETAR EL JUEGO! +${this.config.pointsValues.completionBonus} puntos`);
+      }
+      
       this.displayFinalMessage();
       this.logGameStats();
     },
@@ -340,16 +457,36 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     },
 
-    // MODIFICADO: Muestra el mensaje final con los botones de acción
+    // MODIFICADO: Muestra el mensaje final con formato simplificado
     displayFinalMessage() {
       const playerWon = this.state.bossHp <= 0;
+      
+      // Calcular puntaje normalizado (0-100)
+      const normalizedScore = this.calculateNormalizedScore();
+      
+      // Calcular tiempo de juego en formato legible
+      let gameTimeDisplay = "0s";
+      if (this.state.gameStartTime && this.state.gameEndTime) {
+        const totalDurationSeconds = Math.round((this.state.gameEndTime - this.state.gameStartTime) / 1000);
+        const minutes = Math.floor(totalDurationSeconds / 60);
+        const seconds = totalDurationSeconds % 60;
+        
+        if (minutes > 0) {
+          gameTimeDisplay = `${minutes}m ${seconds}s`;
+        } else {
+          gameTimeDisplay = `${seconds}s`;
+        }
+      }
+      
       this.elements.finalMessage.style.display = 'flex';
       this.elements.finalMessage.innerHTML = `
         <div class="result-text">
           ${playerWon ? '¡VICTORIA!' : '¡DERROTA!'}
-          
         </div>
-        <small>Puntaje Final: ${this.state.score}</small>
+        <div style="margin: 20px 0; display: flex; justify-content: center; gap: 40px; font-size: 0.7em; font-weight: 400;">
+          <div style="font-weight: 400;">PUNTOS: ${normalizedScore}/100</div>
+          <div style="font-weight: 400;">TIEMPO: ${gameTimeDisplay}</div>
+        </div>
         <div class="end-game-buttons">
           <button class="end-game-btn" onclick="Game.startGame()">Reiniciar</button>
           <button class="end-game-btn" onclick="Game.goHome()">Volver al Inicio</button>
@@ -358,18 +495,105 @@ document.addEventListener('DOMContentLoaded', () => {
       this.elements.finalMessage.className = `final-message ${playerWon ? 'win' : 'lose'}`;
     },
 
+    // NUEVO: Calcula el puntaje normalizado (0-100) basado en el desempeño
+    calculateNormalizedScore() {
+      // Calcular el puntaje máximo teórico posible
+      const maxBasePoints = this.state.totalQuestionsPresented * this.config.pointsValues.baseCorrect;
+      const maxRapidBonus = this.state.totalQuestionsPresented * this.config.pointsValues.rapidBonus; // Si todas fueran rápidas
+      const maxStreakBonus = Math.floor(this.state.totalQuestionsPresented / 3) * this.config.pointsValues.streakBonus; // Máximo de rachas posibles
+      const maxCompletionBonus = this.config.pointsValues.completionBonus; // Bonus por completar
+      
+      const maxPossibleScore = maxBasePoints + maxRapidBonus + maxStreakBonus + maxCompletionBonus;
+      
+      // Calcular porcentaje
+      const normalizedScore = Math.round((this.state.score / maxPossibleScore) * 100);
+      
+      console.log(`Cálculo de puntaje normalizado:
+        - Puntaje obtenido: ${this.state.score}
+        - Puntaje máximo teórico: ${maxPossibleScore}
+        - Porcentaje: ${normalizedScore}%`);
+      
+      return Math.min(100, Math.max(0, normalizedScore)); // Asegurar que esté entre 0-100
+    },
+
     logGameStats() {
       let totalDurationSeconds = 0;
       if (this.state.gameStartTime && this.state.gameEndTime) {
-        totalDurationSeconds = ((this.state.gameEndTime - this.state.gameStartTime) / 1000).toFixed(2);
+        totalDurationSeconds = Math.round((this.state.gameEndTime - this.state.gameStartTime) / 1000);
       }
+      
+      const normalizedScore = this.calculateNormalizedScore();
+      
       const gameStats = {
         puntajeObtenido: this.state.score,
+        puntajeNormalizado: normalizedScore,
         preguntasFalladas: this.state.incorrectAnswersCount,
         preguntasAcertadas: this.state.correctAnswersCount,
-        tiempoTotalDeJuegoSegundos: totalDurationSeconds
+        totalPreguntasMostradas: this.state.totalQuestionsPresented,
+        tiempoTotalDeJuegoSegundos: totalDurationSeconds,
+        juegoCompletado: this.state.gameCompleted,
+        bonusCompletado: this.state.gameCompleted ? this.config.pointsValues.completionBonus : 0
       };
+      
       console.log("=== Estadísticas Finales del Juego ===", JSON.stringify(gameStats, null, 2));
+      
+      // Enviar datos a la API
+      this.sendGameDataToAPI(gameStats, totalDurationSeconds);
+    },
+
+    async sendGameDataToAPI(gameStats, timeInSeconds) {
+      // Si no hay user_id en la URL, no enviar datos
+      if (!currentUserId) {
+        console.log('No se encontró user_id en la URL. No se enviarán datos a la API.');
+        return null;
+      }
+
+      const gameData = {
+        user_id: currentUserId, // user_id dinámico desde la URL
+        game_id: 3, // ID estático por ahora
+        correct_challenges: this.state.correctAnswersCount, // Preguntas respondidas correctamente
+        total_challenges: this.state.totalQuestionsPresented, // Total de preguntas que se mostraron
+        time_spent: timeInSeconds // Tiempo total en segundos
+      };
+      
+      console.log('Datos del juego para enviar a la base de datos:', gameData);
+      
+      // Mostrar indicador de carga
+      showDataSendingIndicator();
+      
+      try {
+        // Enviar datos a la API
+        const response = await fetch(`https://puramentebackend.onrender.com/api/game-attempts/from-game`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(gameData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          console.log('Datos enviados exitosamente:', data);
+          // Mostrar mensaje de éxito temporalmente
+          updateLoadingText('¡Datos enviados correctamente!');
+          setTimeout(() => {
+            hideDataSendingIndicator();
+          }, 2000); // Ocultar después de 2 segundos
+        } else {
+          throw new Error(`Error del servidor: ${response.status} - ${data.message || 'Error desconocido'}`);
+        }
+        
+      } catch (error) {
+        console.error('Error enviando datos:', error);
+        // Mostrar mensaje de error temporalmente
+        updateLoadingText('Error al enviar datos');
+        setTimeout(() => {
+          hideDataSendingIndicator();
+        }, 3000); // Ocultar después de 3 segundos
+      }
+      
+      return gameData; // Retorna los datos para que puedas usarlos si necesitas
     },
 
     showVillainTaunt() {
