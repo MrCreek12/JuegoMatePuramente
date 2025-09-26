@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const gameData = {
         user_id: currentUserId, // user_id dinámico desde la URL
-        game_id: 3, // ID estático por ahora
+        game_id: 1, // ID estático por ahora
         correct_challenges: this.state.correctAnswersCount, // Preguntas respondidas correctamente
         total_challenges: this.state.totalQuestionsPresented, // Total de preguntas que se mostraron
         time_spent: timeInSeconds // Tiempo total en segundos
