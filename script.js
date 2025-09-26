@@ -541,6 +541,17 @@ document.addEventListener('DOMContentLoaded', () => {
       this.sendGameDataToAPI(gameStats, totalDurationSeconds);
     },
 
+    // NUEVO: Calcula el puntaje máximo teórico posible basado en preguntas realmente mostradas
+    calculateMaxPossibleScore() {
+      const totalQuestions = this.state.totalQuestionsPresented; // Preguntas realmente mostradas (4)
+      const baseScore = totalQuestions * this.config.pointsValues.baseCorrect; // 4 × 10 = 40
+      const rapidBonus = totalQuestions * this.config.pointsValues.rapidBonus; // 4 × 2 = 8 (si todas son rápidas)
+      const streakBonuses = Math.floor(totalQuestions / 3) * this.config.pointsValues.streakBonus; // 1 × 5 = 5
+      const completionBonus = this.config.pointsValues.completionBonus; // 10
+      
+      return baseScore + rapidBonus + streakBonuses + completionBonus; // 63 total máximo
+    },
+
     async sendGameDataToAPI(gameStats, timeInSeconds) {
       // Si no hay user_id en la URL, no enviar datos
       if (!currentUserId) {
@@ -548,15 +559,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
       }
 
+      const maxScore = this.calculateMaxPossibleScore(); // Puntaje máximo teórico (63)
+      const playerScore = this.state.score; // Puntaje obtenido por el jugador
+      
+      // Convertir a escala de 0 a 100
+      const scoreOutOf100 = Math.round((playerScore / maxScore) * 100);
+
       const gameData = {
         user_id: currentUserId, // user_id dinámico desde la URL
         game_id: 1, // ID estático por ahora
-        correct_challenges: this.state.correctAnswersCount, // Preguntas respondidas correctamente
-        total_challenges: this.state.totalQuestionsPresented, // Total de preguntas que se mostraron
+        correct_challenges: scoreOutOf100, // Puntaje del jugador en escala 0-100
+        total_challenges: 100, // Puntaje máximo siempre 100
         time_spent: timeInSeconds // Tiempo total en segundos
       };
       
       console.log('Datos del juego para enviar a la base de datos:', gameData);
+      console.log(`Conversión de puntaje: ${playerScore}/${maxScore} = ${scoreOutOf100}/100`);
       
       // Mostrar indicador de carga
       showDataSendingIndicator();
