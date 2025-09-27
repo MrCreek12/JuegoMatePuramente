@@ -14,14 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const userId = urlParams.get('user_id');
     
     if (userId) {
-      console.log('Usuario logueado:', userId);
       // Aquí puedes usar el user_id para:
       // - Guardar progreso del usuario
       // - Personalizar la experiencia
       // - Enviar estadísticas al backend
       return userId;
     } else {
-      console.log('Usuario no identificado');
       return null;
     }
   };
@@ -54,23 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // === DEFINICIÓN DE PREGUNTAS Y DATOS DEL JUEGO =========================
   // =========================================================================
-  const gameQuestions = [
-    { "question": "¿Cuánto es 7 + 5?", "answer": 12, "options": [10, 12, 15, 11] },
-    { "question": "¿Cuál es el resultado de 10 + 3?", "answer": 13, "options": [11, 12, 13, 14] },
-    { "question": "Si tienes 4 + 3 manzanas, ¿cuántas tienes?", "answer": 7, "options": [5, 6, 7, 8] },
-    { "question": "Suma: 8 + 6", "answer": 14, "options": [12, 13, 14, 15] },
-    { "question": "¿Cuánto es 9 + 9?", "answer": 18, "options": [16, 17, 18, 19] },
-    { "question": "Calcula: 15 + 5", "answer": 20, "options": [18, 19, 20, 21] },
-    { "question": "Si tienes 12 y te dan 4 más, ¿cuánto tienes?", "answer": 16, "options": [14, 15, 16, 17] },
-    { "question": "Resultado de 11 + 7", "answer": 18, "options": [17, 18, 19, 20] },
-    { "question": "Suma los números 13 y 6", "answer": 19, "options": [18, 19, 20, 21] },
-    { "question": "¿Cuánto es 20 + 10?", "answer": 30, "options": [25, 28, 30, 32] },
-    { "question": "1 + 1", "answer": 2, "options": [1, 2, 3, 4] },
-    { "question": "5 + 2", "answer": 7, "options": [6, 7, 8, 9] },
-    { "question": "4 + 4", "answer": 8, "options": [6, 7, 8, 9] },
-    { "question": "10 + 10", "answer": 20, "options": [18, 19, 20, 21] },
-    { "question": "15 + 15", "answer": 30, "options": [25, 28, 30, 35] }
-  ];
+  
+  // Variable global para almacenar las preguntas cargadas desde la API
+  let gameQuestions = [];
 
   // NUEVO: Array con consejos matemáticos para la pantalla de pausa
   const mathTips = [
@@ -81,6 +65,50 @@ document.addEventListener('DOMContentLoaded', () => {
     "El cero fue inventado en la India y es fundamental para el sistema numérico que usamos hoy.",
     "Multiplicar por 11 es fácil: para 25x11, separa el 2 y 5, y en medio pon su suma (2+5=7). ¡El resultado es 275!"
   ];
+  // =========================================================================
+
+  // =========================================================================
+  // === FUNCIÓN PARA CARGAR PREGUNTAS DESDE LA API ========================
+  // =========================================================================
+  
+  async function loadQuestionsFromAPI() {
+    try {
+      showDataSendingIndicator();
+      updateLoadingText('Cargando preguntas...');
+      
+      const response = await fetch('https://puramentebackend.onrender.com/api/gamedata/category/matematicas');
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extraer las preguntas del nuevo formato de respuesta de la API
+      if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+        const gameData = data.data[0]; // Tomar el primer elemento del array data
+        if (gameData.gamedata && gameData.gamedata.Sumas && Array.isArray(gameData.gamedata.Sumas)) {
+          gameQuestions = gameData.gamedata.Sumas;
+        } else {
+          throw new Error('No se encontraron preguntas de Sumas en gamedata');
+        }
+      } else {
+        throw new Error('Formato de respuesta inesperado de la API');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando preguntas desde la API:', error.message);
+      updateLoadingText('Error: No se pudieron cargar las preguntas');
+      // Lanzar el error para que startGame() pueda manejarlo
+      throw new Error(`No se pudieron cargar las preguntas: ${error.message}`);
+    } finally {
+      // Ocultar indicador después de 2 segundos
+      setTimeout(() => {
+        hideDataSendingIndicator();
+      }, 2000);
+    }
+  }
+  
   // =========================================================================
 
   const Game = {
@@ -129,13 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
       this.cacheDOMElements();
       this.bindEvents();
       this.createStars(200);
-      
-      // Mostrar user_id actual para debugging
-      if (currentUserId) {
-        console.log(`🎮 Usuario actual: ${currentUserId}`);
-      } else {
-        console.log('⚠️  No se encontró user_id en la URL. Los datos del juego no se enviarán a la API.');
-      }
     },
 
     cacheDOMElements() {
@@ -180,6 +201,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async startGame() {
       const selectedDifficulty = 'medio';
       
+      try {
+        // Cargar preguntas desde la API antes de iniciar el juego
+        await loadQuestionsFromAPI();
+        
+        // Verificar que se hayan cargado preguntas
+        if (!gameQuestions || gameQuestions.length === 0) {
+          throw new Error('No se encontraron preguntas válidas en la respuesta de la API');
+        }
+        
+      } catch (error) {
+        console.error('❌ Error al iniciar el juego:', error.message);
+        alert('Error: No se pudieron cargar las preguntas del juego. Por favor, inténtalo de nuevo.');
+        return; // Salir sin iniciar el juego
+      }
+      
       this.state.gameTimeLimit = this.config.timeLimits[selectedDifficulty];
       this.state.playerHp = this.config.maxHp;
       this.state.bossHp = this.config.maxHp;
@@ -187,19 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.failureCounter = 0;
       this.state.correctAnswersCount = 0;
       this.state.incorrectAnswersCount = 0;
-      this.state.totalQuestionsPresented = 0; // NUEVO: Resetear contador de preguntas mostradas
+      this.state.totalQuestionsPresented = 0;
       this.state.gameStartTime = null;
       this.state.gameEndTime = null;
-      this.state.isPaused = false; // NUEVO: Asegurarse que el juego no inicie en pausa
-      // NUEVO: Resetear variables del sistema de puntaje
+      this.state.isPaused = false;
       this.state.consecutiveCorrectAnswers = 0;
       this.state.answerStartTime = null;
       this.state.gameCompleted = false;
 
       this.state.gameActive = false;
       this.elements.finalMessage.style.display = 'none';
-      this.elements.pauseOverlay.classList.add('hidden'); // NUEVO: Ocultar overlay de pausa
-      this.elements.pauseBtn.textContent = '⏸'; // NUEVO: Resetear ícono del botón
+      this.elements.pauseOverlay.classList.add('hidden');
+      this.elements.pauseBtn.textContent = '⏸';
 
       this.state.questions = [...gameQuestions].sort(() => Math.random() - 0.5);
       this.state.currentQuestionIndex = 0;
@@ -213,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       this.state.gameStartTime = Date.now(); 
       this.state.gameActive = true;
-      this.elements.pauseBtn.classList.remove('hidden'); // NUEVO: Mostrar el botón de pausa
+      this.elements.pauseBtn.classList.remove('hidden');
       this.newQuestion();
     },
 
@@ -401,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Aplicar bonus por completar el juego si el jugador ganó
       if (this.state.gameCompleted) {
         this.state.score += this.config.pointsValues.completionBonus;
-        console.log(`¡BONUS POR COMPLETAR EL JUEGO! +${this.config.pointsValues.completionBonus} puntos`);
       }
       
       this.displayFinalMessage();
@@ -508,11 +542,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Calcular porcentaje
       const normalizedScore = Math.round((this.state.score / maxPossibleScore) * 100);
       
-      console.log(`Cálculo de puntaje normalizado:
-        - Puntaje obtenido: ${this.state.score}
-        - Puntaje máximo teórico: ${maxPossibleScore}
-        - Porcentaje: ${normalizedScore}%`);
-      
       return Math.min(100, Math.max(0, normalizedScore)); // Asegurar que esté entre 0-100
     },
 
@@ -535,8 +564,6 @@ document.addEventListener('DOMContentLoaded', () => {
         bonusCompletado: this.state.gameCompleted ? this.config.pointsValues.completionBonus : 0
       };
       
-      console.log("=== Estadísticas Finales del Juego ===", JSON.stringify(gameStats, null, 2));
-      
       // Enviar datos a la API
       this.sendGameDataToAPI(gameStats, totalDurationSeconds);
     },
@@ -555,7 +582,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async sendGameDataToAPI(gameStats, timeInSeconds) {
       // Si no hay user_id en la URL, no enviar datos
       if (!currentUserId) {
-        console.log('No se encontró user_id en la URL. No se enviarán datos a la API.');
         return null;
       }
 
@@ -573,9 +599,6 @@ document.addEventListener('DOMContentLoaded', () => {
         time_spent: timeInSeconds // Tiempo total en segundos
       };
       
-      console.log('Datos del juego para enviar a la base de datos:', gameData);
-      console.log(`Conversión de puntaje: ${playerScore}/${maxScore} = ${scoreOutOf100}/100`);
-      
       // Mostrar indicador de carga
       showDataSendingIndicator();
       
@@ -592,7 +615,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await response.json();
         
         if (response.ok) {
-          console.log('Datos enviados exitosamente:', data);
           // Mostrar mensaje de éxito temporalmente
           updateLoadingText('¡Datos enviados correctamente!');
           setTimeout(() => {
