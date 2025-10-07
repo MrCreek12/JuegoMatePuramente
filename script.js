@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showDataSendingIndicator();
       updateLoadingText('Cargando preguntas...');
       
-      const response = await fetch('https://puramentebackend.onrender.com/api/gamedata/category/matematicas');
+      const response = await fetch('https://puramentebackend.onrender.com/api/gamedata/game/1/category/matematicas');
       
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
