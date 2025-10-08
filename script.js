@@ -47,7 +47,19 @@ document.addEventListener('DOMContentLoaded', () => {
       damageValues: { playerAttack: 25, enemyWrongAnswer: 20, enemyTimeout: 15 },
       pointsValues: { baseCorrect: 10, penaltyWrongAnswer: 5, penaltyTimeout: 10 },
       trashTalkFrequency: 2,
-      villainTaunts: ["¡Casi!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!", "¿Calculadora? Jeje", "¡Uy, esa no era!"]
+      villainTaunts: ["¡Casi!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!", "¿Calculadora? Jeje", "¡Uy, esa no era!"],
+      // NUEVO: Configuración de audio
+      audio: {
+        volumes: {
+          bgm: 0.2, // Música de fondo
+          sfx: 0.8, // Efectos de sonido generales
+          win: 0.6, // Victoria
+          lose: 0.6, // Derrota
+          timerWarning: 0.8, // Advertencia de tiempo
+          countdown: 0.7 // Cuenta regresiva
+        },
+        timerWarningThreshold: 5 // Segundos restantes para activar la advertencia de tiempo (ajustar si se desea más tarde, ej: 3)
+      }
     },
 
     state: {
@@ -68,13 +80,99 @@ document.addEventListener('DOMContentLoaded', () => {
       correctAnswersCount: 0,
       incorrectAnswersCount: 0,
       gameStartTime: null,
-      gameEndTime: null
+      gameEndTime: null,
+      // MODIFICADO: Ahora guarda el valor de timeLeft cuando el sonido de advertencia fue reproducido por última vez
+      lastTimerWarningSoundTime: null 
     },
 
     elements: {},
 
+    // NUEVO: Objeto para la gestión de sonidos
+    sound: {
+      bgMusic: null,
+      sfxCorrect: null,
+      sfxIncorrect: null,
+      sfxPlayerAttack: null,
+      sfxEnemyHit: null,
+      sfxPlayerHit: null,
+      sfxWin: null,
+      sfxLose: null,
+      sfxButton: null,
+      sfxCountdown: null,
+      sfxTimerWarning: null,
+
+      init(elements, config) {
+        this.bgMusic = elements.bgMusic;
+        this.sfxCorrect = elements.sfxCorrect;
+        this.sfxIncorrect = elements.sfxIncorrect;
+        this.sfxPlayerAttack = elements.sfxPlayerAttack;
+        this.sfxEnemyHit = elements.sfxEnemyHit;
+        this.sfxPlayerHit = elements.sfxPlayerHit;
+        this.sfxWin = elements.sfxWin;
+        this.sfxLose = elements.sfxLose;
+        this.sfxButton = elements.sfxButton;
+        this.sfxCountdown = elements.sfxCountdown;
+        this.sfxTimerWarning = elements.sfxTimerWarning;
+
+        // Establecer volúmenes iniciales
+        this.bgMusic.volume = config.audio.volumes.bgm;
+        this.sfxCorrect.volume = config.audio.volumes.sfx;
+        this.sfxIncorrect.volume = config.audio.volumes.sfx;
+        this.sfxPlayerAttack.volume = config.audio.volumes.sfx;
+        this.sfxEnemyHit.volume = config.audio.volumes.sfx;
+        this.sfxPlayerHit.volume = config.audio.volumes.sfx;
+        this.sfxWin.volume = config.audio.volumes.win;
+        this.sfxLose.volume = config.audio.volumes.lose;
+        this.sfxButton.volume = config.audio.volumes.sfx;
+        this.sfxCountdown.volume = config.audio.volumes.countdown;
+        this.sfxTimerWarning.volume = config.audio.volumes.timerWarning;
+        
+        // No es necesario añadir event listeners 'ended' aquí,
+        // playSFX ya maneja currentTime = 0 para reinicio inmediato.
+      },
+
+      playBGM() {
+        if (this.bgMusic) {
+          this.bgMusic.play().catch(e => console.log("Error al reproducir música de fondo:", e));
+        }
+      },
+      pauseBGM() {
+        if (this.bgMusic) this.bgMusic.pause();
+      },
+      stopBGM() {
+        if (this.bgMusic) {
+          this.bgMusic.pause();
+          this.bgMusic.currentTime = 0;
+        }
+      },
+      playSFX(sfxElement) {
+        if (sfxElement) {
+          sfxElement.currentTime = 0; // Reiniciar para permitir reproducciones rápidas
+          sfxElement.play().catch(e => console.log("Error al reproducir SFX:", e));
+        }
+      },
+      // Ayuda para reproducir múltiples SFX a la vez
+      playSFXGroup(...sfxElements) {
+          sfxElements.forEach(sfx => this.playSFX(sfx));
+      }
+    },
+
     init() {
       this.cacheDOMElements();
+      // NUEVO: Cachear elementos de audio
+      this.elements.bgMusic = document.getElementById('bgMusic');
+      this.elements.sfxCorrect = document.getElementById('sfxCorrect');
+      this.elements.sfxIncorrect = document.getElementById('sfxIncorrect');
+      this.elements.sfxPlayerAttack = document.getElementById('sfxPlayerAttack');
+      this.elements.sfxEnemyHit = document.getElementById('sfxEnemyHit');
+      this.elements.sfxPlayerHit = document.getElementById('sfxPlayerHit');
+      this.elements.sfxWin = document.getElementById('sfxWin');
+      this.elements.sfxLose = document.getElementById('sfxLose');
+      this.elements.sfxButton = document.getElementById('sfxButton');
+      this.elements.sfxCountdown = document.getElementById('sfxCountdown');
+      this.elements.sfxTimerWarning = document.getElementById('sfxTimerWarning');
+
+      this.sound.init(this.elements, this.config); // Inicializar el gestor de sonido
       this.bindEvents();
       this.createStars(200);
     },
@@ -84,11 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
         menuContainer: document.getElementById('menu-container'),
         gameContainer: document.getElementById('game-container'),
         startGameBtn: document.getElementById('startGameBtn'),
-        // NUEVO: Elementos para la pausa
         pauseBtn: document.getElementById('pauseBtn'),
         pauseOverlay: document.getElementById('pause-overlay'),
         mathTip: document.getElementById('math-tip'),
-        // ---
         attackFlash: document.getElementById('attackFlash'),
         scoreDisplay: document.getElementById('scoreDisplay'),
         playerLifeBar: document.getElementById('playerLifeBar'),
@@ -111,9 +207,21 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     bindEvents() {
-      this.elements.startGameBtn.addEventListener('click', () => this.startGame());
-      // NUEVO: Evento para el botón de pausa
-      this.elements.pauseBtn.addEventListener('click', () => this.togglePause());
+      this.elements.startGameBtn.addEventListener('click', () => {
+        this.sound.playSFX(this.sound.sfxButton); // Sonido de botón
+        this.startGame();
+      });
+      this.elements.pauseBtn.addEventListener('click', () => {
+        this.sound.playSFX(this.sound.sfxButton); // Sonido de botón
+        this.togglePause();
+      });
+
+      // Delegar clic de botones de respuesta para el sonido
+      this.elements.answerOptions.addEventListener('click', (event) => {
+          if (event.target.classList.contains('answer-btn')) {
+              this.sound.playSFX(this.sound.sfxButton);
+          }
+      });
     },
 
     async startGame() {
@@ -128,12 +236,13 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.incorrectAnswersCount = 0;
       this.state.gameStartTime = null;
       this.state.gameEndTime = null;
-      this.state.isPaused = false; // NUEVO: Asegurarse que el juego no inicie en pausa
+      this.state.isPaused = false;
+      this.state.lastTimerWarningSoundTime = null; // Reiniciar estado de advertencia de tiempo
 
       this.state.gameActive = false;
       this.elements.finalMessage.style.display = 'none';
-      this.elements.pauseOverlay.classList.add('hidden'); // NUEVO: Ocultar overlay de pausa
-      this.elements.pauseBtn.textContent = '⏸'; // NUEVO: Resetear ícono del botón
+      this.elements.pauseOverlay.classList.add('hidden');
+      this.elements.pauseBtn.textContent = '⏸';
 
       this.state.questions = [...gameQuestions].sort(() => Math.random() - 0.5);
       this.state.currentQuestionIndex = 0;
@@ -143,16 +252,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       this.updateUI();
       
+      this.sound.playBGM(); // NUEVO: Reproducir música de fondo al iniciar el juego
+
       await this.runCountdown();
 
       this.state.gameStartTime = Date.now(); 
       this.state.gameActive = true;
-      this.elements.pauseBtn.classList.remove('hidden'); // NUEVO: Mostrar el botón de pausa
+      this.elements.pauseBtn.classList.remove('hidden');
       this.newQuestion();
     },
 
     // NUEVO: Función para volver al menú principal
     goHome() {
+        this.sound.playSFX(this.sound.sfxButton); // Sonido de botón
+        this.sound.stopBGM(); // Detener BGM al volver al inicio
         this.elements.gameContainer.classList.add('hidden');
         this.elements.finalMessage.style.display = 'none';
         this.elements.menuContainer.classList.remove('hidden');
@@ -166,11 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (this.state.isPaused) {
             clearInterval(this.state.timer);
+            this.sound.pauseBGM(); // Pausar BGM
             this.elements.pauseOverlay.classList.remove('hidden');
             this.elements.mathTip.textContent = mathTips[Math.floor(Math.random() * mathTips.length)];
             this.elements.pauseBtn.textContent = '▶️';
         } else {
             this.elements.pauseOverlay.classList.add('hidden');
+            this.sound.playBGM(); // Reanudar BGM
             this.elements.pauseBtn.textContent = '⏸';
             this.resumeTimer();
         }
@@ -185,10 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
       countdownOverlay.classList.remove('hidden');
       for (let i = 3; i > 0; i--) {
         countdownText.textContent = i;
-        await sleep(1500);
+        this.sound.playSFX(this.sound.sfxCountdown); // Sonido de cuenta regresiva
+        await sleep(1200); // Ajustado a 1.2 segundos para dar más espacio al sonido
       }
       countdownText.textContent = '¡A pelear!';
-      await sleep(1000);
+      this.sound.playSFX(this.sound.sfxCountdown); // Sonido final de "go!"
+      await sleep(1200); // Mantener coherencia
       countdownOverlay.classList.add('hidden');
       elementsToToggle.forEach(el => el.style.visibility = 'visible');
     },
@@ -217,10 +334,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       this.state.gameActive = false;
       clearInterval(this.state.timer);
+      this.state.lastTimerWarningSoundTime = null; // Reiniciar estado de advertencia de tiempo
 
       if (selectedAnswer === this.state.currentCorrectAnswer) {
+        this.sound.playSFX(this.sound.sfxCorrect); // NUEVO: Sonido de respuesta correcta
         this.handleCorrectAnswer();
       } else {
+        this.sound.playSFX(this.sound.sfxIncorrect); // NUEVO: Sonido de respuesta incorrecta
         this.handleIncorrectAnswer();
       }
       this.updateUI();
@@ -252,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(this.state.timer);
       if (!this.state.gameActive) return;
       this.state.gameActive = false;
+      this.state.lastTimerWarningSoundTime = null; // Reiniciar estado de advertencia de tiempo
 
       this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyTimeout);
       this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyTimeout);
@@ -286,9 +407,17 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.gameActive = false;
       clearInterval(this.state.timer);
       this.state.gameEndTime = Date.now();
-      this.elements.pauseBtn.classList.add('hidden'); // NUEVO: Ocultar botón de pausa
+      this.elements.pauseBtn.classList.add('hidden');
+      this.sound.stopBGM(); // NUEVO: Detener música de fondo al terminar el juego
       this.displayFinalMessage();
       this.logGameStats();
+
+      // NUEVO: Reproducir sonido de victoria o derrota
+      if (this.state.bossHp <= 0) {
+        this.sound.playSFX(this.sound.sfxWin);
+      } else {
+        this.sound.playSFX(this.sound.sfxLose);
+      }
     },
 
     startTimer() {
@@ -324,7 +453,21 @@ document.addEventListener('DOMContentLoaded', () => {
       this.elements.bossHpText.textContent = `${this.state.bossHp} / ${this.config.maxHp}`;
       this.elements.scoreDisplay.textContent = `Puntaje: ${this.state.score}`;
       this.elements.timer.textContent = `Tiempo: ${Math.max(0, this.state.timeLeft)}s`;
-      this.elements.timer.classList.toggle('blink-warning', this.state.timeLeft <= 5 && this.state.gameActive && !this.state.isPaused);
+      
+      const isWarningZone = this.state.timeLeft <= this.config.audio.timerWarningThreshold && this.state.timeLeft > 0 && this.state.gameActive && !this.state.isPaused;
+      this.elements.timer.classList.toggle('blink-warning', isWarningZone);
+
+      // MODIFICADO: Reproducir sonido de advertencia de tiempo cada segundo en la zona de advertencia
+      if (isWarningZone) {
+          // Solo reproducir si el timeLeft actual es diferente al último que reprodujo el sonido
+          if (this.state.timeLeft !== this.state.lastTimerWarningSoundTime) {
+              this.sound.playSFX(this.sound.sfxTimerWarning);
+              this.state.lastTimerWarningSoundTime = this.state.timeLeft;
+          }
+      } else {
+          // Resetear el estado de la advertencia si ya no estamos en la zona de advertencia
+          this.state.lastTimerWarningSoundTime = null;
+      }
     },
 
     renderNewQuestion() {
@@ -356,6 +499,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       this.elements.finalMessage.className = `final-message ${playerWon ? 'win' : 'lose'}`;
+      
+      // NUEVO: Añadir event listeners para los botones creados dinámicamente
+      const restartBtn = this.elements.finalMessage.querySelector('.end-game-btn:nth-child(1)');
+      const homeBtn = this.elements.finalMessage.querySelector('.end-game-btn:nth-child(2)');
+      
+      restartBtn.addEventListener('click', () => this.sound.playSFX(this.sound.sfxButton));
+      homeBtn.addEventListener('click', () => this.sound.playSFX(this.sound.sfxButton));
     },
 
     logGameStats() {
@@ -386,12 +536,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (effectType === 'attack') {
             this.elements.enemyCharacter.classList.add('shake', 'hit-effect');
             this.elements.attackFlash.classList.add('active');
+            // NUEVO: Reproducir sonido de ataque del jugador y golpe al enemigo
+            this.sound.playSFXGroup(this.sound.sfxPlayerAttack, this.sound.sfxEnemyHit);
             setTimeout(() => {
                 this.elements.enemyCharacter.classList.remove('shake', 'hit-effect');
                 this.elements.attackFlash.classList.remove('active');
             }, 500);
         } else if (effectType === 'playerHit') {
             this.elements.playerCharacter.classList.add('shake');
+            // NUEVO: Reproducir sonido de golpe al jugador
+            this.sound.playSFX(this.sound.sfxPlayerHit);
             setTimeout(() => this.elements.playerCharacter.classList.remove('shake'), 500);
         }
     },
