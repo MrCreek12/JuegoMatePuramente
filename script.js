@@ -8,26 +8,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // Función de ayuda para crear pausas
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Función para extraer user_id de la URL
+  const getUserId = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user_id');
+    
+    if (userId) {
+      // Aquí puedes usar el user_id para:
+      // - Guardar progreso del usuario
+      // - Personalizar la experiencia
+      // - Enviar estadísticas al backend
+      return userId;
+    } else {
+      return null;
+    }
+  };
+
+  // Llamar la función cuando cargue el juego
+  const currentUserId = getUserId();
+
+  // Funciones para el indicador de envío de datos
+  const showDataSendingIndicator = () => {
+    const overlay = document.getElementById('data-sending-overlay');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+    }
+  };
+
+  const hideDataSendingIndicator = () => {
+    const overlay = document.getElementById('data-sending-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+    }
+  };
+
+  const updateLoadingText = (text) => {
+    const loadingText = document.getElementById('loading-text');
+    if (loadingText) {
+      loadingText.textContent = text;
+    }
+  };
+
   // =========================================================================
   // === DEFINICIÓN DE PREGUNTAS Y DATOS DEL JUEGO =========================
   // =========================================================================
-  const gameQuestions = [
-    { "question": "¿Cuánto es 7 + 5?", "answer": 12, "options": [10, 12, 15, 11] },
-    { "question": "¿Cuál es el resultado de 10 + 3?", "answer": 13, "options": [11, 12, 13, 14] },
-    { "question": "Si tienes 4 + 3 manzanas, ¿cuántas tienes?", "answer": 7, "options": [5, 6, 7, 8] },
-    { "question": "Suma: 8 + 6", "answer": 14, "options": [12, 13, 14, 15] },
-    { "question": "¿Cuánto es 9 + 9?", "answer": 18, "options": [16, 17, 18, 19] },
-    { "question": "Calcula: 15 + 5", "answer": 20, "options": [18, 19, 20, 21] },
-    { "question": "Si tienes 12 y te dan 4 más, ¿cuánto tienes?", "answer": 16, "options": [14, 15, 16, 17] },
-    { "question": "Resultado de 11 + 7", "answer": 18, "options": [17, 18, 19, 20] },
-    { "question": "Suma los números 13 y 6", "answer": 19, "options": [18, 19, 20, 21] },
-    { "question": "¿Cuánto es 20 + 10?", "answer": 30, "options": [25, 28, 30, 32] },
-    { "question": "1 + 1", "answer": 2, "options": [1, 2, 3, 4] },
-    { "question": "5 + 2", "answer": 7, "options": [6, 7, 8, 9] },
-    { "question": "4 + 4", "answer": 8, "options": [6, 7, 8, 9] },
-    { "question": "10 + 10", "answer": 20, "options": [18, 19, 20, 21] },
-    { "question": "15 + 15", "answer": 30, "options": [25, 28, 30, 35] }
-  ];
+  
+  // Variable global para almacenar las preguntas cargadas desde la API
+  let gameQuestions = [];
 
   // NUEVO: Array con consejos matemáticos para la pantalla de pausa
   const mathTips = [
@@ -40,12 +67,62 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
   // =========================================================================
 
+  // =========================================================================
+  // === FUNCIÓN PARA CARGAR PREGUNTAS DESDE LA API ========================
+  // =========================================================================
+  
+  async function loadQuestionsFromAPI() {
+    try {
+      showDataSendingIndicator();
+      updateLoadingText('Cargando preguntas...');
+      
+      const response = await fetch('https://puramentebackend.onrender.com/api/gamedata/game/1/category/matematicas');
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extraer las preguntas del nuevo formato de respuesta de la API
+      if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
+        const gameData = data.data[0]; // Tomar el primer elemento del array data
+        if (gameData.gamedata && gameData.gamedata.Sumas && Array.isArray(gameData.gamedata.Sumas)) {
+          gameQuestions = gameData.gamedata.Sumas;
+        } else {
+          throw new Error('No se encontraron preguntas de Sumas en gamedata');
+        }
+      } else {
+        throw new Error('Formato de respuesta inesperado de la API');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cargando preguntas desde la API:', error.message);
+      updateLoadingText('Error: No se pudieron cargar las preguntas');
+      // Lanzar el error para que startGame() pueda manejarlo
+      throw new Error(`No se pudieron cargar las preguntas: ${error.message}`);
+    } finally {
+      // Ocultar indicador después de 2 segundos
+      setTimeout(() => {
+        hideDataSendingIndicator();
+      }, 2000);
+    }
+  }
+  
+  // =========================================================================
+
   const Game = {
     config: {
       maxHp: 100,
       timeLimits: { facil: 30, medio: 15, dificil: 10, hardcore: 6 },
       damageValues: { playerAttack: 25, enemyWrongAnswer: 20, enemyTimeout: 15 },
-      pointsValues: { baseCorrect: 10, penaltyWrongAnswer: 5, penaltyTimeout: 10 },
+      pointsValues: { 
+        baseCorrect: 10,      // Puntaje base por respuesta correcta
+        baseIncorrect: 0,     // Sin puntos por respuestas incorrectas
+        rapidBonus: 2,        // Bonus por responder en menos de 2 segundos
+        streakBonus: 5,       // Bonus por racha de 3 correctas seguidas
+        completionBonus: 10   // Bonus por completar el juego
+      },
       trashTalkFrequency: 2,
       villainTaunts: ["¡Casi!", "¡Más rápido!", "¡Mis problemas son difíciles!", "¡Sigue intentando!", "¿Calculadora? Jeje", "¡Uy, esa no era!"],
       // NUEVO: Configuración de audio
@@ -62,6 +139,31 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     },
 
+      state: {
+        playerHp: 0,
+        bossHp: 0,
+        score: 0,
+        failureCounter: 0,
+        timeLeft: 0,
+        gameTimeLimit: 0,
+        currentCorrectAnswer: null,
+        currentQuestionOptions: [],
+        gameActive: false,
+        isPaused: false, // NUEVO: Estado para controlar la pausa
+        timer: null,
+        speechBubbleTimeout: null,
+        questions: [],
+        currentQuestionIndex: 0,
+        correctAnswersCount: 0,
+        incorrectAnswersCount: 0,
+        totalQuestionsPresented: 0, // NUEVO: Contador del total de preguntas mostradas
+        gameStartTime: null,
+        gameEndTime: null,
+        // NUEVO: Variables para el sistema de puntaje
+        consecutiveCorrectAnswers: 0, // Contador de respuestas correctas consecutivas
+        answerStartTime: null, // Tiempo cuando se mostró la pregunta
+        gameCompleted: false // Indica si el juego se completó (jugador ganó)
+      },    elements: {},
     state: {
       playerHp: 0,
       bossHp: 0,
@@ -202,7 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
         countdownOverlay: document.getElementById('countdown-overlay'),
         countdownText: document.getElementById('countdown-text'),
         gameUi: document.querySelector('.game-ui'),
-        gameHeader: document.getElementById('game-header')
+        gameHeader: document.getElementById('game-header'),
+        dataSendingOverlay: document.getElementById('data-sending-overlay'),
+        loadingText: document.getElementById('loading-text')
       };
     },
 
@@ -227,6 +331,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async startGame() {
       const selectedDifficulty = 'medio';
       
+      try {
+        // Cargar preguntas desde la API antes de iniciar el juego
+        await loadQuestionsFromAPI();
+        
+        // Verificar que se hayan cargado preguntas
+        if (!gameQuestions || gameQuestions.length === 0) {
+          throw new Error('No se encontraron preguntas válidas en la respuesta de la API');
+        }
+        
+      } catch (error) {
+        console.error('❌ Error al iniciar el juego:', error.message);
+        alert('Error: No se pudieron cargar las preguntas del juego. Por favor, inténtalo de nuevo.');
+        return; // Salir sin iniciar el juego
+      }
+      
       this.state.gameTimeLimit = this.config.timeLimits[selectedDifficulty];
       this.state.playerHp = this.config.maxHp;
       this.state.bossHp = this.config.maxHp;
@@ -234,13 +353,20 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.failureCounter = 0;
       this.state.correctAnswersCount = 0;
       this.state.incorrectAnswersCount = 0;
+      this.state.totalQuestionsPresented = 0;
       this.state.gameStartTime = null;
       this.state.gameEndTime = null;
+      this.state.isPaused = false;
+      this.state.consecutiveCorrectAnswers = 0;
+      this.state.answerStartTime = null;
+      this.state.gameCompleted = false;
       this.state.isPaused = false;
       this.state.lastTimerWarningSoundTime = null; // Reiniciar estado de advertencia de tiempo
 
       this.state.gameActive = false;
       this.elements.finalMessage.style.display = 'none';
+      this.elements.pauseOverlay.classList.add('hidden');
+      this.elements.pauseBtn.textContent = '⏸';
       this.elements.pauseOverlay.classList.add('hidden');
       this.elements.pauseBtn.textContent = '⏸';
 
@@ -258,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       this.state.gameStartTime = Date.now(); 
       this.state.gameActive = true;
+      this.elements.pauseBtn.classList.remove('hidden');
       this.elements.pauseBtn.classList.remove('hidden');
       this.newQuestion();
     },
@@ -316,6 +443,10 @@ document.addEventListener('DOMContentLoaded', () => {
       this.renderNewQuestion();
       this.updateUI();
       this.startTimer();
+      // NUEVO: Incrementar contador de preguntas mostradas
+      this.state.totalQuestionsPresented++;
+      // NUEVO: Registrar el tiempo cuando se muestra la pregunta
+      this.state.answerStartTime = Date.now();
     },
 
     generateQuestionData() {
@@ -348,20 +479,51 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     handleCorrectAnswer() {
-      const pointsEarned = this.config.pointsValues.baseCorrect + this.state.timeLeft;
+      // Calcular tiempo de respuesta
+      const responseTime = (Date.now() - this.state.answerStartTime) / 1000;
+      
+      // Puntaje base
+      let pointsEarned = this.config.pointsValues.baseCorrect;
+      let bonusMessages = [];
+      
+      // Bonus por rapidez (menos de 2 segundos)
+      if (responseTime < 2) {
+        pointsEarned += this.config.pointsValues.rapidBonus;
+        bonusMessages.push(`¡RAPIDEZ! +${this.config.pointsValues.rapidBonus}`);
+      }
+      
+      // Incrementar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers++;
+      
+      // Bonus por racha (cada 3 respuestas seguidas correctas)
+      if (this.state.consecutiveCorrectAnswers % 3 === 0) {
+        pointsEarned += this.config.pointsValues.streakBonus;
+        bonusMessages.push(`¡RACHA x3! +${this.config.pointsValues.streakBonus}`);
+      }
+      
       this.state.score += pointsEarned;
       this.state.bossHp = Math.max(0, this.state.bossHp - this.config.damageValues.playerAttack);
       this.state.correctAnswersCount++;
-      this.elements.feedback.textContent = `¡IMPACTO CRÍTICO! +${pointsEarned} puntos`;
+      
+      // Mensaje de feedback con bonificaciones
+      let feedbackText = `¡IMPACTO CRÍTICO! +${this.config.pointsValues.baseCorrect} puntos`;
+      if (bonusMessages.length > 0) {
+        feedbackText += ` (${bonusMessages.join(', ')})`;
+      }
+      
+      this.elements.feedback.textContent = feedbackText;
       this.elements.feedback.className = 'feedback correct';
       this.triggerEffect('attack');
     },
 
     handleIncorrectAnswer() {
-      this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyWrongAnswer);
+      // Reiniciar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers = 0;
+      
+      // Sin penalización de puntos, solo 0 puntos por respuesta incorrecta
       this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyWrongAnswer);
       this.state.incorrectAnswersCount++;
-      this.elements.feedback.textContent = `¡FALLO! -${this.config.pointsValues.penaltyWrongAnswer} puntos`;
+      this.elements.feedback.textContent = `¡FALLO! +0 puntos`;
       this.elements.feedback.className = 'feedback incorrect';
       this.handleFailure();
       this.triggerEffect('playerHit');
@@ -374,10 +536,13 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.gameActive = false;
       this.state.lastTimerWarningSoundTime = null; // Reiniciar estado de advertencia de tiempo
 
-      this.state.score = Math.max(0, this.state.score - this.config.pointsValues.penaltyTimeout);
+      // Reiniciar contador de respuestas consecutivas correctas
+      this.state.consecutiveCorrectAnswers = 0;
+      
+      // Sin penalización de puntos, solo 0 puntos por timeout
       this.state.playerHp = Math.max(0, this.state.playerHp - this.config.damageValues.enemyTimeout);
       this.state.incorrectAnswersCount++;
-      this.elements.feedback.textContent = `¡TIEMPO AGOTADO! -${this.config.pointsValues.penaltyTimeout} puntos`;
+      this.elements.feedback.textContent = `¡TIEMPO AGOTADO! +0 puntos`;
       this.elements.feedback.className = 'feedback incorrect';
       this.handleFailure();
       this.triggerEffect('playerHit');
@@ -393,7 +558,13 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     checkGameStatus() {
-      if (this.state.bossHp <= 0 || this.state.playerHp <= 0) {
+      if (this.state.bossHp <= 0) {
+        // El jugador ganó - marcar como completado para el bonus
+        this.state.gameCompleted = true;
+        setTimeout(() => this.endGame(), 500);
+      } else if (this.state.playerHp <= 0) {
+        // El jugador perdió
+        this.state.gameCompleted = false;
         setTimeout(() => this.endGame(), 500);
       } else {
         setTimeout(() => {
@@ -409,6 +580,12 @@ document.addEventListener('DOMContentLoaded', () => {
       this.state.gameEndTime = Date.now();
       this.elements.pauseBtn.classList.add('hidden');
       this.sound.stopBGM(); // NUEVO: Detener música de fondo al terminar el juego
+      
+      // Aplicar bonus por completar el juego si el jugador ganó
+      if (this.state.gameCompleted) {
+        this.state.score += this.config.pointsValues.completionBonus;
+      }
+      
       this.displayFinalMessage();
       this.logGameStats();
 
@@ -483,16 +660,36 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     },
 
-    // MODIFICADO: Muestra el mensaje final con los botones de acción
+    // MODIFICADO: Muestra el mensaje final con formato simplificado
     displayFinalMessage() {
       const playerWon = this.state.bossHp <= 0;
+      
+      // Calcular puntaje normalizado (0-100)
+      const normalizedScore = this.calculateNormalizedScore();
+      
+      // Calcular tiempo de juego en formato legible
+      let gameTimeDisplay = "0s";
+      if (this.state.gameStartTime && this.state.gameEndTime) {
+        const totalDurationSeconds = Math.round((this.state.gameEndTime - this.state.gameStartTime) / 1000);
+        const minutes = Math.floor(totalDurationSeconds / 60);
+        const seconds = totalDurationSeconds % 60;
+        
+        if (minutes > 0) {
+          gameTimeDisplay = `${minutes}m ${seconds}s`;
+        } else {
+          gameTimeDisplay = `${seconds}s`;
+        }
+      }
+      
       this.elements.finalMessage.style.display = 'flex';
       this.elements.finalMessage.innerHTML = `
         <div class="result-text">
           ${playerWon ? '¡VICTORIA!' : '¡DERROTA!'}
-          
         </div>
-        <small>Puntaje Final: ${this.state.score}</small>
+        <div style="margin: 20px 0; display: flex; justify-content: center; gap: 40px; font-size: 0.7em; font-weight: 400;">
+          <div style="font-weight: 400;">PUNTOS: ${normalizedScore}/100</div>
+          <div style="font-weight: 400;">TIEMPO: ${gameTimeDisplay}</div>
+        </div>
         <div class="end-game-buttons">
           <button class="end-game-btn" onclick="Game.startGame()">Reiniciar</button>
           <button class="end-game-btn" onclick="Game.goHome()">Volver al Inicio</button>
@@ -508,18 +705,111 @@ document.addEventListener('DOMContentLoaded', () => {
       homeBtn.addEventListener('click', () => this.sound.playSFX(this.sound.sfxButton));
     },
 
+    // NUEVO: Calcula el puntaje normalizado (0-100) basado en el desempeño
+    calculateNormalizedScore() {
+      // Calcular el puntaje máximo teórico posible
+      const maxBasePoints = this.state.totalQuestionsPresented * this.config.pointsValues.baseCorrect;
+      const maxRapidBonus = this.state.totalQuestionsPresented * this.config.pointsValues.rapidBonus; // Si todas fueran rápidas
+      const maxStreakBonus = Math.floor(this.state.totalQuestionsPresented / 3) * this.config.pointsValues.streakBonus; // Máximo de rachas posibles
+      const maxCompletionBonus = this.config.pointsValues.completionBonus; // Bonus por completar
+      
+      const maxPossibleScore = maxBasePoints + maxRapidBonus + maxStreakBonus + maxCompletionBonus;
+      
+      // Calcular porcentaje
+      const normalizedScore = Math.round((this.state.score / maxPossibleScore) * 100);
+      
+      return Math.min(100, Math.max(0, normalizedScore)); // Asegurar que esté entre 0-100
+    },
+
     logGameStats() {
       let totalDurationSeconds = 0;
       if (this.state.gameStartTime && this.state.gameEndTime) {
-        totalDurationSeconds = ((this.state.gameEndTime - this.state.gameStartTime) / 1000).toFixed(2);
+        totalDurationSeconds = Math.round((this.state.gameEndTime - this.state.gameStartTime) / 1000);
       }
+      
+      const normalizedScore = this.calculateNormalizedScore();
+      
       const gameStats = {
         puntajeObtenido: this.state.score,
+        puntajeNormalizado: normalizedScore,
         preguntasFalladas: this.state.incorrectAnswersCount,
         preguntasAcertadas: this.state.correctAnswersCount,
-        tiempoTotalDeJuegoSegundos: totalDurationSeconds
+        totalPreguntasMostradas: this.state.totalQuestionsPresented,
+        tiempoTotalDeJuegoSegundos: totalDurationSeconds,
+        juegoCompletado: this.state.gameCompleted,
+        bonusCompletado: this.state.gameCompleted ? this.config.pointsValues.completionBonus : 0
       };
-      console.log("=== Estadísticas Finales del Juego ===", JSON.stringify(gameStats, null, 2));
+      
+      // Enviar datos a la API
+      this.sendGameDataToAPI(gameStats, totalDurationSeconds);
+    },
+
+    // NUEVO: Calcula el puntaje máximo teórico posible basado en preguntas realmente mostradas
+    calculateMaxPossibleScore() {
+      const totalQuestions = this.state.totalQuestionsPresented; // Preguntas realmente mostradas (4)
+      const baseScore = totalQuestions * this.config.pointsValues.baseCorrect; // 4 × 10 = 40
+      const rapidBonus = totalQuestions * this.config.pointsValues.rapidBonus; // 4 × 2 = 8 (si todas son rápidas)
+      const streakBonuses = Math.floor(totalQuestions / 3) * this.config.pointsValues.streakBonus; // 1 × 5 = 5
+      const completionBonus = this.config.pointsValues.completionBonus; // 10
+      
+      return baseScore + rapidBonus + streakBonuses + completionBonus; // 63 total máximo
+    },
+
+    async sendGameDataToAPI(gameStats, timeInSeconds) {
+      // Si no hay user_id en la URL, no enviar datos
+      if (!currentUserId) {
+        return null;
+      }
+
+      const maxScore = this.calculateMaxPossibleScore(); // Puntaje máximo teórico (63)
+      const playerScore = this.state.score; // Puntaje obtenido por el jugador
+      
+      // Convertir a escala de 0 a 100
+      const scoreOutOf100 = Math.round((playerScore / maxScore) * 100);
+
+      const gameData = {
+        user_id: currentUserId, // user_id dinámico desde la URL
+        game_id: 1, // ID estático por ahora
+        correct_challenges: scoreOutOf100, // Puntaje del jugador en escala 0-100
+        total_challenges: 100, // Puntaje máximo siempre 100
+        time_spent: timeInSeconds // Tiempo total en segundos
+      };
+      
+      // Mostrar indicador de carga
+      showDataSendingIndicator();
+      
+      try {
+        // Enviar datos a la API
+        const response = await fetch(`https://puramentebackend.onrender.com/api/game-attempts/from-game`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(gameData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          // Mostrar mensaje de éxito temporalmente
+          updateLoadingText('¡Datos enviados correctamente!');
+          setTimeout(() => {
+            hideDataSendingIndicator();
+          }, 2000); // Ocultar después de 2 segundos
+        } else {
+          throw new Error(`Error del servidor: ${response.status} - ${data.message || 'Error desconocido'}`);
+        }
+        
+      } catch (error) {
+        console.error('Error enviando datos:', error);
+        // Mostrar mensaje de error temporalmente
+        updateLoadingText('Error al enviar datos');
+        setTimeout(() => {
+          hideDataSendingIndicator();
+        }, 3000); // Ocultar después de 3 segundos
+      }
+      
+      return gameData; // Retorna los datos para que puedas usarlos si necesitas
     },
 
     showVillainTaunt() {
