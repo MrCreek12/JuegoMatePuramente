@@ -45,11 +45,27 @@
   <!-- Contenedor del Juego -->
   <div id="game-container" class="game-container hidden">
     
-    <!-- === NUEVO: Elementos para la Pausa === -->
+    <!-- === ELEMENTOS DE PAUSA MODIFICADOS === -->
     <button id="pauseBtn" class="pause-button hidden">⏸</button>
     <div id="pause-overlay" class="pause-overlay hidden">
         <h2>Juego en pausa</h2>
         <p id="math-tip"></p>
+        <!-- Opciones de Audio -->
+        <div class="pause-controls">
+          <div class="volume-control">
+            <label for="musicVolume">Música</label>
+            <input type="range" id="musicVolume" min="0" max="1" step="0.05">
+          </div>
+          <div class="volume-control">
+            <label for="sfxVolume">Efectos</label>
+            <input type="range" id="sfxVolume" min="0" max="1" step="0.05">
+          </div>
+        </div>
+        <!-- Botones de Acción -->
+        <div class="pause-buttons">
+          <button id="resumeBtn" class="cta-button">Reanudar</button>
+          <button id="homeBtn" class="cta-button">Volver al Inicio</button>
+        </div>
     </div>
     <!-- ===================================== -->
 
@@ -94,7 +110,7 @@
     </div>
   </div>
 
-  <!-- Audio Elements - NUEVOS -->
+  <!-- Audio Elements -->
   <audio id="bgMusic" loop preload="auto">
     <source src="TheFatRat - Fire [Chapter 8].mp3" type="audio/mpeg">
     <source src="audio/bg_music.ogg" type="audio/ogg">
