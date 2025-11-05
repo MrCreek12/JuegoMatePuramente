@@ -87,27 +87,52 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       showDataSendingIndicator();
       updateLoadingText('Cargando preguntas...');
-      
-      const response = await fetch('https://puramentebackend.onrender.com/api/gamedata/game/1/category/matematicas');
-      
+
+      let apiUrl = `${GAME_CONFIG.API_BASE_URL}/api/gamedata/game/${GAME_CONFIG.GAME_ID}/category/${encodeURIComponent(subject)}`;
+      if (sessionToken) {
+        apiUrl += `?session=${sessionToken}`;
+      }
+
+      const response = await fetch(apiUrl);
+
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
-      // Extraer las preguntas del nuevo formato de respuesta de la API
+
       if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
-        const gameData = data.data[0]; // Tomar el primer elemento del array data
-        if (gameData.gamedata && gameData.gamedata.Sumas && Array.isArray(gameData.gamedata.Sumas)) {
-          gameQuestions = gameData.gamedata.Sumas;
+        const gameTopics = {};
+
+        data.data.forEach(item => {
+          if (Array.isArray(item.gamedata)) {
+            item.gamedata.forEach(gameDataItem => {
+              if (gameDataItem.title && gameDataItem.subcategoria) {
+                const topicKey = gameDataItem.title;
+                gameTopics[topicKey] = gameDataItem.subcategoria;
+              } else {
+                Object.keys(gameDataItem).forEach(key => {
+                  if (Array.isArray(gameDataItem[key]) && gameDataItem[key].length > 0) {
+                    gameTopics[key] = gameDataItem[key];
+                  }
+                });
+              }
+            });
+          } else {
+            Object.keys(item.gamedata).forEach(subcategory => {
+              gameTopics[subcategory] = item.gamedata[subcategory];
+            });
+          }
+        });
+
+        if (gameTopics['Sumas'] && Array.isArray(gameTopics['Sumas'])) {
+          gameQuestions = gameTopics['Sumas'];
         } else {
-          throw new Error('No se encontraron preguntas de Sumas en gamedata');
+          throw new Error('No se encontraron preguntas de Sumas en los datos del juego');
         }
       } else {
         throw new Error('Formato de respuesta inesperado de la API');
       }
-      
     } catch (error) {
       console.error('❌ Error cargando preguntas desde la API:', error.message);
       updateLoadingText('Error: No se pudieron cargar las preguntas');
