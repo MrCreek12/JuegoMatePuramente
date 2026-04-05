@@ -4,6 +4,26 @@
  * El juego se inicia cuando el DOM está completamente cargado.
  */
 document.addEventListener('DOMContentLoaded', () => {
+  // === AUDIO ===
+  // Referencias a los elementos de audio
+  const bgMusic = document.getElementById('bgMusic');
+  const sfxCorrect = document.getElementById('sfxCorrect');
+  const sfxIncorrect = document.getElementById('sfxIncorrect');
+  const sfxPlayerAttack = document.getElementById('sfxPlayerAttack');
+  const sfxEnemyHit = document.getElementById('sfxEnemyHit');
+  const sfxPlayerHit = document.getElementById('sfxPlayerHit');
+  const sfxWin = document.getElementById('sfxWin');
+  const sfxLose = document.getElementById('sfxLose');
+  const sfxButton = document.getElementById('sfxButton');
+  const sfxCountdown = document.getElementById('sfxCountdown');
+  const sfxTimerWarning = document.getElementById('sfxTimerWarning');
+
+  // Función para reproducir audio de forma segura
+  function playAudio(audioElement) {
+    if (!audioElement) return;
+    audioElement.currentTime = 0;
+    audioElement.play().catch(() => {});
+  }
 
   // Función de ayuda para crear pausas
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -66,7 +86,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   
   // Variable global para almacenar las preguntas cargadas desde la API
-  let gameQuestions = [];
+  let gameQuestions = [
+  {
+    question: "¿Cuánto es 5 + 3?",
+    answer: 8,
+    options: [6, 7, 8, 9]
+  },
+  {
+    question: "¿Cuánto es 10 + 7?",
+    answer: 17,
+    options: [15, 16, 17, 18]
+  },
+  {
+    question: "¿Cuánto es 12 + 4?",
+    answer: 16,
+    options: [14, 15, 16, 18]
+  },
+  {
+    question: "¿Cuánto es 9 + 6?",
+    answer: 15,
+    options: [13, 14, 15, 16]
+  },
+  {
+    question: "¿Cuánto es 20 + 5?",
+    answer: 25,
+    options: [23, 24, 25, 26]
+  }
+];
 
   // NUEVO: Array con consejos matemáticos para la pantalla de pausa
   const mathTips = [
@@ -83,69 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // === FUNCIÓN PARA CARGAR PREGUNTAS DESDE LA API ========================
   // =========================================================================
   
-  async function loadQuestionsFromAPI() {
-    try {
-      showDataSendingIndicator();
-      updateLoadingText('Cargando preguntas...');
 
-      let apiUrl = `${GAME_CONFIG.API_BASE_URL}/api/gamedata/game/${GAME_CONFIG.GAME_ID}/category/${encodeURIComponent(subject)}`;
-      if (sessionToken) {
-        apiUrl += `?session=${sessionToken}`;
-      }
-
-      const response = await fetch(apiUrl);
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data && data.success && data.data && Array.isArray(data.data) && data.data.length > 0) {
-        const gameTopics = {};
-
-        data.data.forEach(item => {
-          if (Array.isArray(item.gamedata)) {
-            item.gamedata.forEach(gameDataItem => {
-              if (gameDataItem.title && gameDataItem.subcategoria) {
-                const topicKey = gameDataItem.title;
-                gameTopics[topicKey] = gameDataItem.subcategoria;
-              } else {
-                Object.keys(gameDataItem).forEach(key => {
-                  if (Array.isArray(gameDataItem[key]) && gameDataItem[key].length > 0) {
-                    gameTopics[key] = gameDataItem[key];
-                  }
-                });
-              }
-            });
-          } else {
-            Object.keys(item.gamedata).forEach(subcategory => {
-              gameTopics[subcategory] = item.gamedata[subcategory];
-            });
-          }
-        });
-
-        if (gameTopics['Sumas'] && Array.isArray(gameTopics['Sumas'])) {
-          gameQuestions = gameTopics['Sumas'];
-        } else {
-          throw new Error('No se encontraron preguntas de Sumas en los datos del juego');
-        }
-      } else {
-        throw new Error('Formato de respuesta inesperado de la API');
-      }
-    } catch (error) {
-      console.error('❌ Error cargando preguntas desde la API:', error.message);
-      updateLoadingText('Error: No se pudieron cargar las preguntas');
-      // Lanzar el error para que startGame() pueda manejarlo
-      throw new Error(`No se pudieron cargar las preguntas: ${error.message}`);
-    } finally {
-      // Ocultar indicador después de 2 segundos
-      setTimeout(() => {
-        hideDataSendingIndicator();
-      }, 2000);
-    }
-  }
-  
   // =========================================================================
 
   const Game = {
@@ -236,22 +220,15 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     async startGame() {
+      // Iniciar música de fondo al empezar el juego
+      if (bgMusic) {
+        bgMusic.volume = 0.5;
+        bgMusic.loop = true;
+        playAudio(bgMusic);
+      }
       const selectedDifficulty = 'medio';
       
-      try {
-        // Cargar preguntas desde la API antes de iniciar el juego
-        await loadQuestionsFromAPI();
-        
-        // Verificar que se hayan cargado preguntas
-        if (!gameQuestions || gameQuestions.length === 0) {
-          throw new Error('No se encontraron preguntas válidas en la respuesta de la API');
-        }
-        
-      } catch (error) {
-        console.error('❌ Error al iniciar el juego:', error.message);
-        alert('Error: No se pudieron cargar las preguntas del juego. Por favor, inténtalo de nuevo.');
-        return; // Salir sin iniciar el juego
-      }
+
       
       this.state.gameTimeLimit = this.config.timeLimits[selectedDifficulty];
       this.state.playerHp = this.config.maxHp;
@@ -291,9 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // NUEVO: Función para volver al menú principal
     goHome() {
-        this.elements.gameContainer.classList.add('hidden');
-        this.elements.finalMessage.style.display = 'none';
-        this.elements.menuContainer.classList.remove('hidden');
+      if (bgMusic) bgMusic.pause();
+      this.elements.gameContainer.classList.add('hidden');
+      this.elements.finalMessage.style.display = 'none';
+      this.elements.menuContainer.classList.remove('hidden');
     },
 
     // NUEVO: Función para pausar y reanudar el juego
@@ -370,6 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     handleCorrectAnswer() {
+      playAudio(sfxCorrect);
+      playAudio(sfxPlayerAttack);
       // Calcular tiempo de respuesta
       const responseTime = (Date.now() - this.state.answerStartTime) / 1000;
       
@@ -408,6 +388,8 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     handleIncorrectAnswer() {
+      playAudio(sfxIncorrect);
+      playAudio(sfxPlayerHit);
       // Reiniciar contador de respuestas consecutivas correctas
       this.state.consecutiveCorrectAnswers = 0;
       
@@ -421,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     
     handleTimeout() {
+      playAudio(sfxTimerWarning);
       if (this.state.isPaused) return;
       clearInterval(this.state.timer);
       if (!this.state.gameActive) return;
@@ -469,6 +452,14 @@ document.addEventListener('DOMContentLoaded', () => {
       clearInterval(this.state.timer);
       this.state.gameEndTime = Date.now();
       this.elements.pauseBtn.classList.add('hidden'); // NUEVO: Ocultar botón de pausa
+      
+      // Detener música y reproducir efecto de victoria/derrota
+      if (bgMusic) bgMusic.pause();
+      if (this.state.bossHp <= 0) {
+        playAudio(sfxWin);
+      } else {
+        playAudio(sfxLose);
+      }
       
       // Aplicar bonus por completar el juego si el jugador ganó
       if (this.state.gameCompleted) {
@@ -717,6 +708,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // NUEVO: Hacer el objeto Game accesible globalmente para que los botones onclick() funcionen
+  // Reproducir efecto de botón en todos los botones principales
+  document.addEventListener('click', (e) => {
+    if (e.target.classList && (e.target.classList.contains('cta-button') || e.target.classList.contains('end-game-btn') || e.target.classList.contains('answer-btn'))) {
+      playAudio(sfxButton);
+    }
+  });
+
   window.Game = Game; 
   Game.init();
 });
